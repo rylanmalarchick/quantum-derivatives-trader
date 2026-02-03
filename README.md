@@ -2,7 +2,7 @@
 
 > Exploring quantum computing's potential for financial PDE solving through variational quantum circuits and physics-informed neural networks.
 
-[![Tests](https://img.shields.io/badge/tests-240%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-261%20passing-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.14-blue)]()
 [![PyTorch](https://img.shields.io/badge/pytorch-2.10-orange)]()
 [![PennyLane](https://img.shields.io/badge/pennylane-0.44-blueviolet)]()
@@ -48,7 +48,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 # Run tests
-pytest tests/ -v  # 240 tests
+pytest tests/ -v  # 261 tests
 
 # Train classical PINN baseline (Black-Scholes)
 python scripts/train_classical.py --epochs 5000 --lr 1e-3
@@ -121,9 +121,9 @@ quantum-derivatives-trader/
 
 | Metric | Value |
 |--------|-------|
-| Price fit (relative) | 1.45% |
-| Vol recovery error | 4.70% |
-| Training time | ~30s (500 epochs) |
+| Price fit (relative) | 2.22% |
+| Vol recovery error | 4.51% |
+| Training time | ~2 min (3000 epochs) |
 
 **Key finding**: PINN recovers volatility surface from option prices—**real quant workflow**.
 
@@ -174,7 +174,7 @@ $$\sigma^2(K,T) = \frac{2\left(\frac{\partial C}{\partial T} + rK\frac{\partial 
 
 ```bash
 pytest tests/ -v --tb=short
-# 240 tests passing
+# 261 tests passing
 ```
 
 ### Test Coverage

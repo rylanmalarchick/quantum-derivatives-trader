@@ -13,6 +13,9 @@
 3. [Variational Quantum Circuits](#3-variational-quantum-circuits-for-function-approximation)
 4. [Quantum Amplitude Estimation](#4-quantum-amplitude-estimation)
 5. [Key References](#5-key-references)
+6. [Multi-Asset Black-Scholes PDE](#6-multi-asset-black-scholes-pde)
+7. [Inverse Problems and Volatility Calibration](#7-inverse-problems-and-volatility-calibration)
+8. [Hybrid Quantum-Classical Architectures for High Dimensions](#8-hybrid-quantum-classical-architectures-for-high-dimensions)
 
 ---
 
@@ -364,3 +367,267 @@ Under $\mathbb{Q}$, the asset follows: $dS = rS\,dt + \sigma S\,dW^{\mathbb{Q}}$
 $$|\hat{a} - a| \leq \frac{\pi}{M} + \frac{\pi^2}{M^2}$$
 
 where $M$ is the number of Grover iterations.
+
+---
+
+## 6. Multi-Asset Black-Scholes PDE
+
+### 6.1 Correlated Geometric Brownian Motion
+
+For a basket of $n$ assets, each asset follows geometric Brownian motion with correlated Wiener processes:
+
+$$dS_i = \mu_i S_i \, dt + \sigma_i S_i \, dW_i, \quad i = 1, \ldots, n$$
+
+where the Wiener processes are correlated:
+
+$$\mathbb{E}[dW_i \cdot dW_j] = \rho_{ij} \, dt$$
+
+The correlation matrix $\boldsymbol{\rho} = (\rho_{ij})$ must be symmetric positive semi-definite. The covariance matrix is:
+
+$$\Sigma_{ij} = \rho_{ij} \sigma_i \sigma_j$$
+
+### 6.2 The $n$-Dimensional Black-Scholes PDE
+
+By applying Itô's lemma to a function $V(S_1, \ldots, S_n, t)$ and constructing a delta-hedged portfolio, we derive the **multi-asset Black-Scholes PDE**:
+
+$$\boxed{\frac{\partial V}{\partial t} + \sum_{i=1}^{n} r S_i \frac{\partial V}{\partial S_i} + \frac{1}{2} \sum_{i=1}^{n} \sum_{j=1}^{n} \rho_{ij} \sigma_i \sigma_j S_i S_j \frac{\partial^2 V}{\partial S_i \partial S_j} - rV = 0}$$
+
+This is an $(n+1)$-dimensional PDE in the variables $(S_1, \ldots, S_n, t)$.
+
+**Key differences from 1D case:**
+- Cross-derivative terms $\frac{\partial^2 V}{\partial S_i \partial S_j}$ for $i \neq j$
+- Correlation structure affects the diffusion matrix
+- Computational complexity grows exponentially with $n$
+
+### 6.3 Basket Option Payoffs
+
+A **basket option** is an option on a weighted average of underlying assets. Common types:
+
+| Type | Terminal Condition $V(S_1, \ldots, S_n, T)$ |
+|------|---------------------------------------------|
+| **Equally-weighted call** | $\max\left(\frac{1}{n}\sum_{i=1}^n S_i - K, 0\right)$ |
+| **Weighted basket call** | $\max\left(\sum_{i=1}^n w_i S_i - K, 0\right)$ where $\sum w_i = 1$ |
+| **Best-of call (rainbow)** | $\max\left(\max_i S_i - K, 0\right)$ |
+| **Worst-of call** | $\max\left(\min_i S_i - K, 0\right)$ |
+
+### 6.4 Boundary Conditions
+
+For multi-asset options, boundary conditions are specified when any asset price goes to zero or infinity:
+
+| Boundary | Condition |
+|----------|-----------|
+| $S_i \to 0$ | Reduces to $(n-1)$-asset problem |
+| $S_i \to \infty$ | $V \approx w_i S_i$ (deep ITM contribution) |
+| $t = T$ | Payoff function (terminal condition) |
+
+### 6.5 The Curse of Dimensionality
+
+**Finite difference methods fail** for $n > 3$ assets due to exponential scaling:
+
+For a grid with $N$ points per dimension:
+$$\text{Grid points} = N^{n+1} = O(N^{n+1})$$
+
+| Assets | Dimensions | Grid Points ($N=100$) | Memory (64-bit) |
+|--------|------------|----------------------|-----------------|
+| 1 | 2D | $10^4$ | 80 KB |
+| 2 | 3D | $10^6$ | 8 MB |
+| 3 | 4D | $10^8$ | 800 MB |
+| 5 | 6D | $10^{12}$ | 8 TB |
+| 10 | 11D | $10^{22}$ | Impossible |
+
+**PINNs circumvent this** by sampling collocation points, not discretizing the entire domain.
+
+### 6.6 Latin Hypercube Sampling
+
+For high-dimensional problems, **Latin Hypercube Sampling (LHS)** provides better coverage than random sampling:
+
+**Algorithm:**
+1. Divide each dimension into $N$ equal intervals
+2. Place exactly one sample in each interval per dimension
+3. Randomly shuffle assignments to create sample matrix
+
+**Advantages:**
+- Guarantees uniform marginal distributions
+- Avoids clustering in high dimensions
+- Variance reduction: $\text{Var}_{\text{LHS}} \leq \text{Var}_{\text{MC}}$ for monotonic functions
+- Scales to arbitrary dimensions
+
+For a 5-asset basket with 15,000 collocation points:
+- Random sampling: May leave regions unexplored
+- LHS: Guaranteed coverage of the entire 6D hypercube
+
+---
+
+## 7. Inverse Problems and Volatility Calibration
+
+### 7.1 Forward vs Inverse Problems
+
+| Problem Type | Given | Find | Example |
+|--------------|-------|------|---------|
+| **Forward** | Model parameters $\theta$ | Prices $V$ | Price options given volatility |
+| **Inverse** | Observed data $V^{\text{obs}}$ | Parameters $\theta$ | Calibrate volatility from prices |
+
+Inverse problems are often **ill-posed** in the sense of Hadamard:
+- Solution may not exist (inconsistent data)
+- Solution may not be unique (underdetermined)
+- Solution may be unstable (sensitive to noise)
+
+**Regularization** makes inverse problems well-posed.
+
+### 7.2 The Dupire Local Volatility Model
+
+Bruno Dupire (1994) showed that European option prices uniquely determine a **local volatility function** $\sigma_{\text{loc}}(K, T)$ such that:
+
+$$dS_t = (r - q) S_t \, dt + \sigma_{\text{loc}}(S_t, t) S_t \, dW_t$$
+
+**The Dupire Equation:**
+
+Given a continuum of European call prices $C(K, T)$ for all strikes $K$ and maturities $T$, the local volatility is:
+
+$$\boxed{\sigma_{\text{loc}}^2(K, T) = \frac{2 \left( \frac{\partial C}{\partial T} + (r-q)K\frac{\partial C}{\partial K} + qC \right)}{K^2 \frac{\partial^2 C}{\partial K^2}}}$$
+
+**Derivation insight:** Apply Itô's lemma to the call option in the forward measure, then differentiate w.r.t. strike.
+
+### 7.3 Calibration as an Inverse Problem
+
+**The calibration problem:** Given observed market prices $\{C^{\text{obs}}(K_i, T_j)\}$, find $\sigma(K, T)$.
+
+**Challenges:**
+1. Only discrete $(K, T)$ observations available
+2. Market prices contain noise (bid-ask spread)
+3. Dupire formula requires derivatives → amplifies noise
+4. Surface must satisfy no-arbitrage constraints
+
+### 7.4 PINN Approach to Calibration
+
+PINNs solve the inverse problem by learning $\sigma(K, T)$ as a neural network:
+
+**Architecture:**
+$$\sigma_\theta(K, T) : \mathbb{R}^2 \to \mathbb{R}^+$$
+
+**Loss function:**
+
+$$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{data}} + \lambda_{\text{smooth}} \mathcal{L}_{\text{smooth}} + \lambda_{\text{arb}} \mathcal{L}_{\text{arb}}$$
+
+where:
+
+**Data fidelity:**
+$$\mathcal{L}_{\text{data}} = \frac{1}{N} \sum_{i=1}^{N} \left| C_\theta(K_i, T_i) - C^{\text{obs}}(K_i, T_i) \right|^2$$
+
+**Smoothness regularization:**
+$$\mathcal{L}_{\text{smooth}} = \mathbb{E}\left[ \left| \frac{\partial \sigma}{\partial K} \right|^2 + \left| \frac{\partial \sigma}{\partial T} \right|^2 + \left| \frac{\partial^2 \sigma}{\partial K^2} \right|^2 \right]$$
+
+**Arbitrage-free constraints:**
+- Calendar arbitrage: $C$ must be increasing in $T$
+- Butterfly arbitrage: $\frac{\partial^2 C}{\partial K^2} \geq 0$ (convexity in $K$)
+
+$$\mathcal{L}_{\text{arb}} = \mathbb{E}\left[ \text{ReLU}\left( -\frac{\partial C}{\partial T} \right) + \text{ReLU}\left( -\frac{\partial^2 C}{\partial K^2} \right) \right]$$
+
+### 7.5 Connection to Implied Volatility
+
+**Implied volatility** $\sigma_{\text{IV}}(K, T)$ is the constant volatility that, when input to Black-Scholes, reproduces the market price:
+
+$$C^{\text{BS}}(S_0, K, T, r, \sigma_{\text{IV}}) = C^{\text{market}}(K, T)$$
+
+**Relationship to local volatility:**
+
+For small maturities:
+$$\sigma_{\text{loc}}(K, T) \approx \sigma_{\text{IV}}(K, T) + O(T)$$
+
+For longer maturities, local vol is roughly a "harmonic average" of implied vol along paths.
+
+### 7.6 Synthetic Volatility Surface Model
+
+For testing calibration algorithms, we use a parametric SABR-like surface:
+
+$$\sigma_{\text{IV}}(K, T) = \sigma_0 + \beta_1 \log(K/S_0) + \beta_2 \log^2(K/S_0) + \beta_3 T$$
+
+where:
+- $\sigma_0 \approx 0.20$ (ATM base volatility)
+- $\beta_1 < 0$ (negative skew for equities)
+- $\beta_2 > 0$ (smile curvature)
+- $\beta_3 < 0$ (term structure: vol decreases with maturity)
+
+This captures the essential features of equity volatility surfaces:
+- ATM volatility level
+- Downside skew (higher IV for lower strikes)
+- Smile (higher IV for far OTM/ITM)
+- Term structure (short-term vol typically higher)
+
+---
+
+## 8. Hybrid Quantum-Classical Architectures for High Dimensions
+
+### 8.1 The Quantum Bottleneck
+
+Current VQCs are limited by:
+- **Qubit count:** NISQ devices have 50-100 noisy qubits
+- **Gate fidelity:** Error rates of $10^{-3}$ to $10^{-2}$
+- **Connectivity:** Limited qubit-qubit interactions
+
+For high-dimensional problems (e.g., 6D basket option), directly encoding all inputs into a VQC is impractical.
+
+### 8.2 Hybrid Architecture Strategies
+
+**Strategy 1: Classical Compression**
+$$\text{6D input} \xrightarrow{\text{Classical NN}} \text{2D features} \xrightarrow{\text{VQC}} \text{Output}$$
+
+A classical encoder compresses high-dimensional input to a dimension suitable for the VQC.
+
+**Strategy 2: Ensemble of VQCs**
+$$\text{Output} = \sum_{(i,j)} w_{ij} \cdot \text{VQC}_{ij}(S_i, S_j)$$
+
+Deploy multiple VQCs, each handling a pair of assets. For $n$ assets, use $\binom{n}{2}$ VQCs.
+
+**Strategy 3: Quantum Residual Correction**
+$$V(S, t) = V_{\text{classical}}(S, t) + \alpha \cdot V_{\text{quantum}}(S, t)$$
+
+Use classical network as base predictor, with VQC providing a learned correction.
+
+### 8.3 Expressivity Considerations
+
+The quantum advantage in hybrid architectures may come from:
+- **Inductive bias:** VQC function classes differ from classical NNs
+- **Feature interactions:** Entanglement creates non-local correlations
+- **Optimization landscape:** Different loss landscape geometry
+
+Current evidence is mixed; rigorous quantum advantage for PINN-like tasks remains an open question.
+
+---
+
+## Appendix C: Extended References
+
+### Multi-Asset Options
+
+11. **Glasserman, P.** (2003). *Monte Carlo Methods in Financial Engineering*. Springer.
+    - *Standard reference for high-dimensional option pricing*
+
+12. **Broadie, M., & Glasserman, P.** (1997). Pricing American-style securities using simulation. *Journal of Economic Dynamics and Control*, 21(8-9), 1323-1352.
+    - *Least-squares Monte Carlo for American options*
+
+### Local Volatility
+
+13. **Dupire, B.** (1994). Pricing with a smile. *Risk*, 7(1), 18-20.
+    - *Original Dupire local volatility paper*
+
+14. **Gatheral, J.** (2006). *The Volatility Surface: A Practitioner's Guide*. Wiley.
+    - *Comprehensive treatment of volatility modeling*
+
+15. **Fengler, M. R.** (2009). Arbitrage-free smoothing of the implied volatility surface. *Quantitative Finance*, 9(4), 417-428.
+    - *Regularization for arbitrage-free surfaces*
+
+### Inverse Problems
+
+16. **Tarantola, A.** (2005). *Inverse Problem Theory and Methods for Model Parameter Estimation*. SIAM.
+    - *Mathematical foundations of inverse problems*
+
+17. **Raissi, M., Perdikaris, P., & Karniadakis, G. E.** (2019). Physics-informed neural networks for inverse problems. *Computational Mechanics*, 64(5), 1095-1117.
+    - *PINNs for parameter identification*
+
+### Latin Hypercube Sampling
+
+18. **McKay, M. D., Beckman, R. J., & Conover, W. J.** (1979). A comparison of three methods for selecting values of input variables in the analysis of output from a computer code. *Technometrics*, 21(2), 239-245.
+    - *Original LHS paper*
+
+19. **Owen, A. B.** (1998). Latin supercube sampling for very high-dimensional simulations. *ACM Transactions on Modeling and Computer Simulation*, 8(1), 71-102.
+    - *LHS for high-dimensional problems*
