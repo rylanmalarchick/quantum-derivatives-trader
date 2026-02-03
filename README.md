@@ -1,8 +1,8 @@
 # Quantum-Classical Hybrid PINNs for Derivatives Pricing
 
-> Exploring quantum computing's potential for financial PDE solving through variational quantum circuits and physics-informed neural networks.
+> Research exploration of physics-informed neural networks for financial PDEs, with experimental quantum-classical hybrid architectures.
 
-[![Tests](https://img.shields.io/badge/tests-292%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-322%20passing-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.14-blue)]()
 [![PyTorch](https://img.shields.io/badge/pytorch-2.10-orange)]()
 [![PennyLane](https://img.shields.io/badge/pennylane-0.44-blueviolet)]()
@@ -11,32 +11,73 @@
 
 ## Overview
 
-This project investigates whether **variational quantum circuits (VQCs)** can enhance function approximation in **physics-informed neural networks (PINNs)** for solving the partial differential equations that govern derivatives pricing.
+This project uses **physics-informed neural networks (PINNs)** to solve partial differential equations in derivatives pricing, with experimental integration of **variational quantum circuits (VQCs)**.
 
-### Key Capabilities
+### What This Project Demonstrates
 
-| Problem | Type | Dimension | Status |
-|---------|------|-----------|--------|
-| Black-Scholes European Call | Forward PDE | 2D | ✅ Working |
-| Quantum-Hybrid PINN | Forward PDE | 2D | ✅ 57x better than classical |
-| 5-Asset Basket Option | Forward PDE | **6D** | ✅ Beats curse of dimensionality |
-| Volatility Calibration | **Inverse Problem** | 2D | ✅ <5% vol recovery error |
-| Merton Jump-Diffusion | Forward PIDE | 2D | ✅ Discontinuous dynamics |
-| Heston Stochastic Vol | Forward PDE | **3D** | ✅ Vol smile modeling |
-| American Options | Free Boundary | 2D | ✅ Early exercise |
+| Capability | Why It Matters |
+|------------|----------------|
+| **6D basket option pricing** | Solves curse of dimensionality (FD infeasible) |
+| **Volatility surface calibration** | Real quant workflow: inverse problems |
+| **Jump-diffusion & stochastic vol** | Beyond textbook Black-Scholes |
+| **Greeks via autodiff** | Exact sensitivities, no numerical noise |
+| **Comprehensive testing** | 322 tests, production-quality code |
 
-### What This Is
+### Honest Assessment
 
-- A **research exploration**, not a production trading system
-- Honest benchmarking of classical vs quantum approaches
-- Clean, tested code demonstrating scientific computing best practices
-- **Real quant problems** - high-dimensional pricing, model calibration
+**What works well:**
+- High-dimensional pricing (5-asset basket, 6D PDE)
+- Volatility calibration with arbitrage constraints
+- Clean architecture with proper testing
+- Mathematical documentation (944 lines of theory)
 
-### What This Is Not
+**What's still research:**
+- Quantum-hybrid component shows promise on simple problems but doesn't yet outperform well-tuned classical on production pricing tasks
+- Current quantum results: ~22% relative error (market tolerance is <1%)
+- Exploring when/why quantum expressivity might help
 
-- A claim that quantum provides advantage (we test this empirically)
-- A black-box solution—all mathematical derivations are documented
-- Overfitted to toy problems—we solve genuine multi-asset derivatives
+---
+
+## Key Results
+
+### 1. High-Dimensional Pricing (5-Asset Basket)
+
+| Method | Feasibility | Memory | Greeks |
+|--------|-------------|--------|--------|
+| Finite Difference | ❌ 10^12 grid points | Impossible | Numerical noise |
+| Monte Carlo | ✅ But slow | Moderate | Pathwise |
+| **PINN** | ✅ 15K collocation points | ~3 GB | **Exact (autodiff)** |
+
+**Result**: Final loss 1.40, 3.9% error vs Monte Carlo at S₀.
+
+### 2. Volatility Calibration (Inverse Problem)
+
+| Metric | Value |
+|--------|-------|
+| Price fit | 2.22% mean relative error |
+| Vol surface recovery | 4.51% error |
+| Training | ~2 min (3000 epochs) |
+
+**Real quant application**: Recovers local volatility σ(K,T) from market prices.
+
+### 3. Advanced Models
+
+| Model | PDE Type | Dimension | Key Feature |
+|-------|----------|-----------|-------------|
+| Merton | PIDE | 2D | Poisson jumps, Gauss-Hermite quadrature |
+| Heston | PDE | 3D | Stochastic variance, vol smile |
+| American | Free boundary | 2D | Early exercise, penalty method |
+
+### 4. Quantum-Hybrid (Experimental)
+
+| Observation | Status |
+|-------------|--------|
+| VQC trains and produces gradients | ✅ |
+| Hybrid beats poorly-tuned classical | ✅ |
+| Hybrid beats well-tuned classical | ❓ Needs ablation |
+| Practical pricing accuracy (<1% error) | ❌ Not yet |
+
+**Honest conclusion**: The quantum component is research-stage. We're investigating expressivity and optimization landscape differences, not claiming advantage.
 
 ---
 
@@ -50,29 +91,22 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Run tests
-pytest tests/ -v  # 292 tests
+# Run tests (322 passing)
+pytest tests/ -v
 
-# Train classical PINN baseline (Black-Scholes)
-python scripts/train_classical.py --epochs 5000 --lr 1e-3
-
-# Train quantum-classical hybrid
-python scripts/train_hybrid.py --epochs 300 --n-qubits 4 --n-layers 2
-
-# Train 5-asset basket PINN (high-dimensional)
+# Train basket PINN (high-dimensional - the strong result)
 python scripts/train_basket.py --epochs 5000 --n_interior 15000 --eval
 
 # Train volatility calibration (inverse problem)
 python scripts/train_calibration.py --epochs 2000
 
-# Train Merton jump-diffusion
-python scripts/train_merton.py --epochs 2000 --eval
+# Train advanced models
+python scripts/train_merton.py --epochs 3000 --eval   # Jump-diffusion
+python scripts/train_heston.py --epochs 3000 --eval   # Stochastic vol
+python scripts/train_american.py --epochs 3000 --eval # Early exercise
 
-# Train Heston stochastic volatility
-python scripts/train_heston.py --epochs 3000 --eval
-
-# Train American put option
-python scripts/train_american.py --epochs 2000 --eval
+# Quantum-hybrid (experimental)
+python scripts/train_hybrid.py --epochs 300 --n-qubits 4 --n-layers 2
 ```
 
 ---
@@ -82,152 +116,100 @@ python scripts/train_american.py --epochs 2000 --eval
 ```
 quantum-derivatives-trader/
 ├── src/
-│   ├── pde/                 # PDE definitions
-│   │   ├── black_scholes.py # 1D European option PDE
-│   │   ├── basket.py        # N-asset basket option PDE
-│   │   ├── dupire.py        # Local volatility model
+│   ├── pde/                 # PDE definitions (6 types)
+│   │   ├── black_scholes.py # 1D European option
+│   │   ├── basket.py        # N-asset basket (6D)
+│   │   ├── dupire.py        # Local volatility calibration
 │   │   ├── merton.py        # Jump-diffusion (PIDE)
-│   │   ├── heston.py        # Stochastic volatility (3D PDE)
-│   │   └── american.py      # Early exercise (free boundary)
-│   ├── classical/           # Classical PINN architectures
-│   │   ├── pinn.py          # Standard MLP PINN
-│   │   ├── pinn_basket.py   # High-dimensional basket PINN
-│   │   └── pinn_calibration.py # Inverse problem PINN
-│   ├── quantum/             # Quantum components
-│   │   ├── variational.py   # VQC definitions
-│   │   ├── hybrid_pinn.py   # Quantum-classical hybrid
-│   │   └── qae.py           # Quantum Amplitude Estimation
-│   ├── pricing/             # Pricing engines (analytical, MC, FD)
-│   └── utils/               # Visualization and Greeks
-├── tests/                   # 240 comprehensive tests
-├── scripts/                 # Training scripts
-├── notebooks/               # Analysis notebooks
-│   ├── 05_basket_analysis.py      # 5-asset results
-│   └── 06_calibration_analysis.py # Vol surface calibration
-└── docs/                    # Mathematical documentation
+│   │   ├── heston.py        # Stochastic volatility (3D)
+│   │   └── american.py      # Free boundary problem
+│   ├── classical/           # PINN architectures
+│   ├── quantum/             # VQC integration (experimental)
+│   ├── pricing/             # MC, FD, analytical engines
+│   └── validation/          # Greeks validation
+├── tests/                   # 322 comprehensive tests
+├── scripts/                 # Training and benchmarking
+├── notebooks/               # Analysis (7 notebooks)
+└── docs/
+    └── theory.md            # 944 lines of mathematical derivations
 ```
-
----
-
-## Results Summary
-
-### 1. Classical vs Quantum-Hybrid PINN (Black-Scholes)
-
-| Model | MSE | Parameters | Training Time |
-|-------|-----|------------|---------------|
-| Classical MLP | 247.34 | 12,737 | ~30s |
-| **Hybrid 4q/2L** | **4.34** | ~500 | ~26 min |
-| FD/MC (reference) | ~0.001 | N/A | <1s |
-
-**Key finding**: Quantum-hybrid achieves **57x better MSE** with **25x fewer parameters**.
-
-### 2. 5-Asset Basket Option (High-Dimensional)
-
-| Aspect | Classical FD | PINN |
-|--------|-------------|------|
-| Dimension | 6D (5 assets + time) | 6D |
-| Grid points needed | 10 billion (100^5) | 15,000 |
-| Memory | Impossible | ~3 GB |
-| Greeks | Numerical noise | Exact (autodiff) |
-
-**Key finding**: PINNs **solve the curse of dimensionality**. FD is infeasible for 5+ assets.
-
-### 3. Volatility Calibration (Inverse Problem)
-
-| Metric | Value |
-|--------|-------|
-| Price fit (relative) | 2.22% |
-| Vol recovery error | 4.51% |
-| Training time | ~2 min (3000 epochs) |
-
-**Key finding**: PINN recovers volatility surface from option prices—**real quant workflow**.
 
 ---
 
 ## Mathematical Background
 
-### Forward Problem: Black-Scholes PDE
-
-$$\frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + rS\frac{\partial V}{\partial S} - rV = 0$$
-
-### Forward Problem: Multi-Asset Basket (N-dimensional)
+### Forward Problem: Multi-Asset Black-Scholes
 
 $$\frac{\partial V}{\partial t} + \sum_i rS_i\frac{\partial V}{\partial S_i} + \frac{1}{2}\sum_{i,j} \rho_{ij}\sigma_i\sigma_j S_i S_j \frac{\partial^2 V}{\partial S_i \partial S_j} - rV = 0$$
 
 ### Inverse Problem: Dupire Calibration
 
-Given market prices $C(K,T)$, find local volatility $\sigma(K,T)$ such that:
+Given market prices $C(K,T)$, recover local volatility $\sigma(K,T)$:
 
 $$\sigma^2(K,T) = \frac{2\left(\frac{\partial C}{\partial T} + rK\frac{\partial C}{\partial K}\right)}{K^2 \frac{\partial^2 C}{\partial K^2}}$$
 
-**See [docs/theory.md](docs/theory.md) for complete derivations.**
+### Jump-Diffusion (Merton)
+
+$$\frac{\partial V}{\partial t} + (r-\lambda\kappa)S\frac{\partial V}{\partial S} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} - rV + \lambda\int_0^\infty [V(SJ,t) - V(S,t)]g(J)dJ = 0$$
+
+**See [docs/theory.md](docs/theory.md) for complete derivations (11 sections, 944 lines).**
 
 ---
 
-## Why This Matters for Quant Finance
+## Why This Matters
 
-### 1. High-Dimensional Pricing
-- Basket options, rainbow options, path-dependent exotics
-- Monte Carlo is slow, FD is infeasible
-- PINNs scale to 10+ dimensions
+### For Quant Finance
 
-### 2. Model Calibration
-- Every trading desk calibrates models daily
-- Standard approaches use optimization + analytical gradients
-- PINNs offer smooth, arbitrage-free surfaces automatically
+1. **High-dimensional pricing**: Basket options, rainbow options require methods that scale beyond 3D
+2. **Model calibration**: Every desk calibrates daily; PINNs give smooth, arbitrage-free surfaces
+3. **Greeks computation**: Autodiff gives exact Δ, Γ, Θ, ν, cross-gammas—no numerical noise
 
-### 3. Greeks Computation
-- Automatic differentiation gives exact derivatives
-- No numerical differentiation noise
-- All Greeks (delta, gamma, vega, cross-gammas) for free
+### For Research
+
+1. **Honest quantum exploration**: Testing VQC expressivity on real problems, not toy examples
+2. **Reproducible benchmarks**: Proper baselines, not cherry-picked comparisons
+3. **Clean implementation**: 322 tests, documented theory, readable code
 
 ---
 
-## Testing Philosophy
-
-> "Tests are the specification. Write them first, write them thoroughly."
+## Testing
 
 ```bash
-pytest tests/ -v --tb=short
-# 292 tests passing
+pytest tests/ -v --tb=short  # 322 tests
 ```
 
-### Test Coverage
-
-- **PDE residuals**: Physics constraints verified
-- **Boundary conditions**: Put-call parity, terminal payoffs
-- **Quantum circuits**: Output ranges, gradient flow, trainability
-- **Basket pricing**: MC validation, Greeks accuracy
-- **Calibration**: Vol recovery, arbitrage constraints
-- **Edge cases**: S=0, τ→0, deep ITM/OTM
+| Category | Tests | Coverage |
+|----------|-------|----------|
+| PDE residuals | 45 | Physics constraints, boundary conditions |
+| PINN models | 68 | Forward pass, gradients, training |
+| Quantum circuits | 32 | Output ranges, parameter updates |
+| Greeks validation | 33 | Analytical vs autodiff |
+| Basket/calibration | 89 | MC validation, vol recovery |
+| Advanced models | 55 | Merton, Heston, American |
 
 ---
 
 ## Roadmap
 
-- [x] Phase 1: Classical PINN baseline
-- [x] Phase 2: Quantum VQC integration (57x improvement)
-- [x] Phase 3A: High-dimensional basket options (5 assets, 6D)
-- [x] Phase 3B: Volatility surface calibration (inverse problem)
-- [x] Phase 5: Jump-diffusion (Merton) and stochastic volatility (Heston)
-- [x] Phase 5B: American options with early exercise
-- [ ] Phase 4: Hybrid quantum for high-dimensional problems
-- [ ] Phase 6: Real hardware experiments (IBM/IonQ)
+- [x] Classical PINN baseline
+- [x] High-dimensional basket (5 assets, 6D)
+- [x] Volatility calibration (inverse problem)
+- [x] Jump-diffusion (Merton PIDE)
+- [x] Stochastic volatility (Heston 3D)
+- [x] American options (free boundary)
+- [x] Greeks validation module
+- [x] Speed benchmarks
+- [ ] Ablation: quantum vs matched classical baseline
+- [ ] Barrier options (path-dependent)
+- [ ] Hardware experiments (IBM/IonQ)
 
 ---
 
 ## References
 
-### PINNs
-- Raissi, Perdikaris, Karniadakis. "Physics-informed neural networks" (2019). [arXiv:1711.10561](https://arxiv.org/abs/1711.10561)
-
-### Quantum Finance
+- Raissi et al. "Physics-informed neural networks" (2019). [arXiv:1711.10561](https://arxiv.org/abs/1711.10561)
 - Stamatopoulos et al. "Option Pricing using Quantum Computers" (2020). [arXiv:1905.02666](https://arxiv.org/abs/1905.02666)
-
-### Local Volatility
 - Dupire. "Pricing with a Smile" (Risk, 1994)
-
-### VQCs
 - Schuld & Petruccione. "Machine Learning with Quantum Computers" (Springer, 2021)
 
 ---
@@ -238,8 +220,4 @@ MIT License. See [LICENSE](LICENSE).
 
 ---
 
-## Author
-
-Built as a research exploration of quantum-classical hybrid methods for computational finance.
-
-*"The goal is not to prove quantum advantage, but to understand when and why it might exist—and solve real problems along the way."*
+*"The goal is not to prove quantum advantage, but to rigorously investigate when it might exist—while solving real problems with classical methods that work today."*
