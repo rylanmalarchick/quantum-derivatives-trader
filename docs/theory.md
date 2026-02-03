@@ -1,6 +1,6 @@
-# Theoretical Foundations
+# Mathematical Foundations
 
-This document covers the mathematical and physical foundations underlying the quantum-classical hybrid approach to derivatives pricing.
+This document provides the theoretical background for the quantum-classical hybrid PINN approach to derivatives pricing.
 
 ---
 
@@ -8,302 +8,347 @@ This document covers the mathematical and physical foundations underlying the qu
 
 ### 1.1 Derivation
 
-The Black-Scholes equation describes the evolution of an option price $V(S, t)$ under the following assumptions:
-- The underlying follows geometric Brownian motion: $dS = \mu S \, dt + \sigma S \, dW$
-- No arbitrage, continuous trading, no dividends
-- Constant volatility $\sigma$ and risk-free rate $r$
+The Black-Scholes partial differential equation describes the evolution of a derivative's price under the following assumptions:
 
-Using Itô's lemma and delta hedging, we obtain the **Black-Scholes PDE**:
+1. The underlying asset follows geometric Brownian motion:
+   $$dS_t = \mu S_t \, dt + \sigma S_t \, dW_t$$
 
-$$\frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + rS \frac{\partial V}{\partial S} - rV = 0$$
+2. Markets are frictionless (no transaction costs, continuous trading)
+3. No arbitrage opportunities exist
+4. Constant volatility $\sigma$ and risk-free rate $r$
 
-This is a backward parabolic PDE solved from the terminal condition (option expiry) back to the present.
+Through delta hedging and Itô's lemma, we derive the **Black-Scholes PDE**:
+
+$$\boxed{\frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + rS\frac{\partial V}{\partial S} - rV = 0}$$
+
+where:
+- $V(S, t)$ is the option value
+- $S$ is the spot price of the underlying
+- $t$ is time
+- $\sigma$ is volatility
+- $r$ is the risk-free interest rate
 
 ### 1.2 Boundary Conditions
 
-For a **European call** option with strike $K$ and maturity $T$:
+For a **European call option** with strike $K$ and maturity $T$:
 
-**Terminal condition (payoff at expiry):**
-$$V(S, T) = \max(S - K, 0) = (S - K)^+$$
+| Condition | Mathematical Form | Physical Meaning |
+|-----------|-------------------|------------------|
+| **Terminal** | $V(S, T) = \max(S - K, 0)$ | Payoff at expiry |
+| **Lower boundary** | $V(0, t) = 0$ | Worthless if $S = 0$ |
+| **Upper boundary** | $V(S, t) \to S - Ke^{-r(T-t)}$ as $S \to \infty$ | Deep ITM approaches intrinsic |
 
-**Lower boundary ($S = 0$):**
-$$V(0, t) = 0$$
+For a **European put option**:
 
-**Upper boundary ($S \to \infty$):**
-$$V(S, t) \approx S - K e^{-r(T-t)} \quad \text{as } S \to \infty$$
-
-For a **European put**:
-$$V(S, T) = \max(K - S, 0) = (K - S)^+$$
-$$V(0, t) = K e^{-r(T-t)}$$
-$$V(S, t) \to 0 \quad \text{as } S \to \infty$$
+| Condition | Mathematical Form |
+|-----------|-------------------|
+| **Terminal** | $V(S, T) = \max(K - S, 0)$ |
+| **Lower boundary** | $V(0, t) = Ke^{-r(T-t)}$ |
+| **Upper boundary** | $V(S, t) \to 0$ as $S \to \infty$ |
 
 ### 1.3 Analytical Solution
 
-The Black-Scholes formula for a European call:
+The closed-form Black-Scholes formula for a European call:
 
-$$C(S, t) = S \cdot N(d_1) - K e^{-r\tau} \cdot N(d_2)$$
+$$C(S, t) = S \cdot N(d_1) - Ke^{-r\tau} \cdot N(d_2)$$
 
-where $\tau = T - t$ is time to maturity, and:
+where $\tau = T - t$ (time to maturity) and:
 
 $$d_1 = \frac{\ln(S/K) + (r + \frac{1}{2}\sigma^2)\tau}{\sigma\sqrt{\tau}}, \quad d_2 = d_1 - \sigma\sqrt{\tau}$$
 
 $N(\cdot)$ is the standard normal CDF.
 
-### 1.4 The Greeks
+### 1.4 Greeks
 
-Option sensitivities derived from the solution:
+The Greeks are sensitivities of option price to various parameters:
 
-| Greek | Definition | Interpretation |
+| Greek | Definition | Formula (Call) |
 |-------|------------|----------------|
-| Delta | $\Delta = \frac{\partial V}{\partial S}$ | Hedge ratio |
-| Gamma | $\Gamma = \frac{\partial^2 V}{\partial S^2}$ | Delta sensitivity |
-| Theta | $\Theta = \frac{\partial V}{\partial t}$ | Time decay |
-| Vega | $\mathcal{V} = \frac{\partial V}{\partial \sigma}$ | Volatility sensitivity |
-| Rho | $\rho = \frac{\partial V}{\partial r}$ | Interest rate sensitivity |
+| **Delta** ($\Delta$) | $\frac{\partial V}{\partial S}$ | $N(d_1)$ |
+| **Gamma** ($\Gamma$) | $\frac{\partial^2 V}{\partial S^2}$ | $\frac{N'(d_1)}{S\sigma\sqrt{\tau}}$ |
+| **Theta** ($\Theta$) | $\frac{\partial V}{\partial t}$ | $-\frac{SN'(d_1)\sigma}{2\sqrt{\tau}} - rKe^{-r\tau}N(d_2)$ |
+| **Vega** ($\nu$) | $\frac{\partial V}{\partial \sigma}$ | $S\sqrt{\tau}N'(d_1)$ |
+| **Rho** ($\rho$) | $\frac{\partial V}{\partial r}$ | $K\tau e^{-r\tau}N(d_2)$ |
 
 ---
 
 ## 2. Physics-Informed Neural Networks (PINNs)
 
-### 2.1 Overview
+### 2.1 Core Idea
 
-PINNs [1] encode physical laws directly into the neural network loss function, enabling learning from physics rather than labeled data.
+PINNs learn solutions to PDEs by incorporating the physical laws (PDEs) directly into the loss function, rather than learning from labeled data alone.
 
-For option pricing, the neural network $\hat{V}_\theta(S, t)$ approximates the true solution $V(S, t)$.
+**Key insight:** The neural network $V_\theta(S, t)$ is trained such that it simultaneously:
+1. Satisfies the PDE at interior points
+2. Matches boundary conditions
+3. Matches terminal/initial conditions
 
-### 2.2 Loss Function Components
+### 2.2 Loss Function Formulation
 
-The total loss is a weighted sum of three components:
+The total PINN loss is:
 
-$$\mathcal{L}(\theta) = \lambda_1 \mathcal{L}_{\text{PDE}} + \lambda_2 \mathcal{L}_{\text{BC}} + \lambda_3 \mathcal{L}_{\text{IC}}$$
+$$\boxed{\mathcal{L}_{\text{total}} = \lambda_{\text{PDE}}\mathcal{L}_{\text{PDE}} + \lambda_{\text{BC}}\mathcal{L}_{\text{BC}} + \lambda_{\text{IC}}\mathcal{L}_{\text{IC}}}$$
 
-**PDE Residual Loss** (physics constraint):
+#### PDE Residual Loss
 
-Sample collocation points $(S_i, t_i)$ in the interior domain and minimize:
+Sample collocation points $\{(S_i, t_i)\}_{i=1}^{N_{\text{int}}}$ in the interior domain:
 
-$$\mathcal{L}_{\text{PDE}} = \frac{1}{N_{\text{int}}} \sum_{i=1}^{N_{\text{int}}} \left| \frac{\partial \hat{V}}{\partial t} + \frac{1}{2}\sigma^2 S_i^2 \frac{\partial^2 \hat{V}}{\partial S^2} + r S_i \frac{\partial \hat{V}}{\partial S} - r\hat{V} \right|^2$$
+$$\mathcal{L}_{\text{PDE}} = \frac{1}{N_{\text{int}}} \sum_{i=1}^{N_{\text{int}}} \left| \mathcal{R}[V_\theta](S_i, t_i) \right|^2$$
 
-Derivatives are computed via automatic differentiation.
+where the **residual operator** $\mathcal{R}$ for Black-Scholes is:
 
-**Boundary Condition Loss:**
+$$\mathcal{R}[V] = \frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + rS\frac{\partial V}{\partial S} - rV$$
 
-$$\mathcal{L}_{\text{BC}} = \frac{1}{N_{\text{bc}}} \sum_{j=1}^{N_{\text{bc}}} \left| \hat{V}(0, t_j) - 0 \right|^2 + \frac{1}{N_{\text{bc}}} \sum_{k=1}^{N_{\text{bc}}} \left| \hat{V}(S_{\max}, t_k) - (S_{\max} - Ke^{-r(T-t_k)}) \right|^2$$
+The derivatives $\frac{\partial V}{\partial t}$, $\frac{\partial V}{\partial S}$, $\frac{\partial^2 V}{\partial S^2}$ are computed via **automatic differentiation**.
 
-**Initial/Terminal Condition Loss** (payoff at maturity):
+#### Boundary Condition Loss
 
-$$\mathcal{L}_{\text{IC}} = \frac{1}{N_{\text{ic}}} \sum_{l=1}^{N_{\text{ic}}} \left| \hat{V}(S_l, T) - \max(S_l - K, 0) \right|^2$$
+Sample boundary points $\{(S_j^{\text{BC}}, t_j^{\text{BC}})\}$:
 
-### 2.3 Training Considerations
+$$\mathcal{L}_{\text{BC}} = \frac{1}{N_{\text{BC}}} \sum_{j=1}^{N_{\text{BC}}} \left| V_\theta(S_j^{\text{BC}}, t_j^{\text{BC}}) - V^{\text{BC}}(S_j^{\text{BC}}, t_j^{\text{BC}}) \right|^2$$
 
-1. **Collocation Point Sampling**: Fresh random points each epoch improve generalization
-2. **Loss Weighting**: $\lambda_1, \lambda_2, \lambda_3$ balance competing objectives
-3. **Input Normalization**: Scale $(S, t)$ to $[0, 1]$ for stable training
-4. **Network Architecture**: Tanh activation preferred for smoothness
+#### Terminal Condition Loss (Initial Condition in backward time)
 
-### 2.4 Advantages for Option Pricing
+Sample terminal points $\{S_k^{\text{IC}}\}$ at $t = T$:
 
-- **Mesh-free**: No grid discretization required
-- **Continuous solution**: Greeks computed via autodiff, not finite differences
-- **Generalization**: Single network valid for all $(S, t)$ in domain
-- **Transfer learning**: Pretrained networks adapt to new parameters
+$$\mathcal{L}_{\text{IC}} = \frac{1}{N_{\text{IC}}} \sum_{k=1}^{N_{\text{IC}}} \left| V_\theta(S_k^{\text{IC}}, T) - \text{payoff}(S_k^{\text{IC}}) \right|^2$$
+
+### 2.3 Adaptive Loss Weighting
+
+Loss terms can have vastly different scales. Adaptive weighting (Wang et al., 2021) adjusts $\lambda$ based on gradient statistics:
+
+$$\lambda_i^{(n+1)} = \alpha \lambda_i^{(n)} + (1-\alpha) \frac{\max_j |\nabla_\theta \mathcal{L}_j|}{|\nabla_\theta \mathcal{L}_i| + \epsilon}$$
+
+This balances gradient magnitudes across loss terms, improving training stability.
+
+### 2.4 Network Architecture
+
+Typical architectures for PINNs:
+
+```
+Input (S, t) → Normalize → [MLP / ResNet] → Output V
+
+MLP: Linear → Tanh → Linear → Tanh → ... → Linear
+ResNet: Linear → [Tanh → Linear → Tanh → Linear + skip] × N → Linear
+```
+
+**Input normalization:** Scale $(S, t)$ to $[0, 1]$ for stable training:
+$$\tilde{S} = S / S_{\max}, \quad \tilde{t} = t / T$$
 
 ---
 
-## 3. Variational Quantum Circuits (VQCs)
+## 3. Variational Quantum Circuits for Function Approximation
 
-### 3.1 Parameterized Quantum Circuits
+### 3.1 Quantum Computing Basics
 
-A VQC implements a unitary transformation $U(\theta)$ parameterized by angles $\theta$:
+A quantum state of $n$ qubits lives in a $2^n$-dimensional Hilbert space:
 
-$$|\psi(\theta)\rangle = U(\theta)|0\rangle^{\otimes n}$$
+$$|\psi\rangle = \sum_{i=0}^{2^n-1} \alpha_i |i\rangle, \quad \sum_i |\alpha_i|^2 = 1$$
 
-For function approximation, we encode inputs $x$ and measure an observable:
+Quantum gates are unitary operations: $U^\dagger U = I$.
 
-$$f_\theta(x) = \langle\psi(x, \theta)| \hat{O} |\psi(x, \theta)\rangle$$
+### 3.2 Variational Quantum Circuit (VQC)
 
-### 3.2 Input Encoding
+A VQC is a parameterized quantum circuit $U(\theta)$ that maps classical inputs to quantum measurements:
 
-**Angle Encoding:**
+$$f_\theta(x) = \langle 0 | U^\dagger(x, \theta) \, M \, U(x, \theta) | 0 \rangle$$
 
-Map classical input $x \in [0, 1]$ to rotation angle:
+where:
+- $U(x, \theta)$ combines **data encoding** and **trainable rotations**
+- $M$ is a measurement observable (e.g., $\sigma_z$)
+- Output is in $[-1, 1]$ for Pauli measurements
 
-$$|x\rangle = R_Y(\pi x)|0\rangle = \cos\left(\frac{\pi x}{2}\right)|0\rangle + \sin\left(\frac{\pi x}{2}\right)|1\rangle$$
+### 3.3 Circuit Architecture
 
-For 2D inputs $(S, t)$, encode on separate qubits or use sequential rotations.
-
-**Data Re-uploading [2]:**
-
-Interleave data encoding with variational layers for enhanced expressivity:
-
-$$U(\theta, x) = \prod_{l=1}^{L} W_l(\theta_l) S(x)$$
-
-where $S(x)$ encodes data and $W_l(\theta_l)$ are trainable unitaries.
-
-### 3.3 Hardware-Efficient Ansatz
-
-A practical circuit structure with single-qubit rotations and nearest-neighbor entanglement:
+**Hardware-Efficient Ansatz:**
 
 ```
-     ┌───────┐     ┌───────┐
-q_0: ┤ Ry(x) ├──■──┤ Rx(θ) ├──■──
-     ├───────┤┌─┴─┐├───────┤┌─┴─┐
-q_1: ┤ Ry(t) ├┤ X ├┤ Ry(θ) ├┤ X ├
-     ├───────┤├───┤├───────┤├───┤
-q_2: ┤ Ry(x) ├┤ X ├┤ Rz(θ) ├┤ X ├
-     └───────┘└───┘└───────┘└───┘
+Layer structure (repeated L times):
+┌───────────────────────────────────────────────────┐
+│  Data Encoding:  RY(x₀)|0⟩  RY(x₁)|1⟩  ...    │
+├───────────────────────────────────────────────────┤
+│  Rotations:      RX(θ₀)RY(θ₁)RZ(θ₂) on each   │
+├───────────────────────────────────────────────────┤
+│  Entanglement:   CNOT ring (0→1→2→...→n→0)    │
+└───────────────────────────────────────────────────┘
 ```
 
-### 3.4 Expressivity and Trainability
+**Data Re-uploading:**
 
-**Expressivity**: VQCs can approximate any continuous function with sufficient depth [3]. The question is efficiency.
+Interleave data encoding with trainable layers for increased expressivity (Pérez-Salinas et al., 2020):
 
-**Barren Plateaus**: Deep random circuits suffer from exponentially vanishing gradients [4]:
+$$U(x, \theta) = \prod_{l=1}^{L} \left[ W_l(\theta_l) \cdot S(x) \right]$$
 
-$$\text{Var}\left[\frac{\partial \mathcal{L}}{\partial \theta_j}\right] \leq O(2^{-n})$$
+where $S(x)$ encodes data and $W_l(\theta_l)$ are trainable.
 
-Mitigation strategies:
-- Shallow circuits with structured ansätze
-- Layer-wise training
-- Initialization near identity
+### 3.4 Expressivity
 
-### 3.5 Hybrid Architecture for PINNs
+VQCs can approximate arbitrary functions under certain conditions:
 
-Replace the classical MLP with a quantum layer:
+**Universal approximation:** A VQC with sufficient depth and data re-uploading can approximate any continuous function (Schuld et al., 2021).
 
-$$\hat{V}_\theta(S, t) = g_{\text{post}}\left( \langle\psi(S, t, \theta)| Z |\psi(S, t, \theta)\rangle \right)$$
+**Fourier perspective:** VQCs compute functions that are sums of Fourier components:
 
-where $g_{\text{post}}$ is a classical postprocessing layer for output scaling.
+$$f_\theta(x) = \sum_\omega c_\omega(\theta) e^{i\omega x}$$
+
+The frequencies $\omega$ are determined by the data encoding, amplitudes $c_\omega$ by trainable parameters.
+
+### 3.5 Hybrid Architecture
+
+For PINN, we use a hybrid quantum-classical architecture:
+
+```
+Classical Preprocessing → VQC → Classical Postprocessing
+
+Input (S, t) → Normalize/Feature expand → [VQC] → Scale to V range → Output
+           ↘ Classical layer (optional) ↗
+```
+
+**Quantum residual:** Use quantum as a correction to classical:
+
+$$V(S, t) = V_{\text{classical}}(S, t) + \alpha \cdot V_{\text{quantum}}(S, t)$$
 
 ---
 
-## 4. Quantum Amplitude Estimation (QAE)
+## 4. Quantum Amplitude Estimation
 
 ### 4.1 Monte Carlo Pricing
 
-Classical Monte Carlo estimates option price as:
+Classical Monte Carlo estimates option prices as:
 
-$$\hat{V} = e^{-rT} \cdot \frac{1}{N} \sum_{i=1}^N \text{payoff}(S_T^{(i)})$$
+$$\hat{V} = e^{-rT} \cdot \frac{1}{N} \sum_{i=1}^{N} \text{payoff}(S_T^{(i)})$$
 
-The standard error scales as $O(1/\sqrt{N})$, requiring $N = O(1/\epsilon^2)$ samples for error $\epsilon$.
+where $S_T^{(i)}$ are simulated terminal prices under risk-neutral measure.
 
-### 4.2 Quantum Speedup
+**Error scaling:** Standard error $\propto 1/\sqrt{N}$, requiring $N \propto 1/\epsilon^2$ samples for precision $\epsilon$.
 
-Quantum Amplitude Estimation [5] achieves error $\epsilon$ with $O(1/\epsilon)$ queries, a **quadratic speedup**.
+### 4.2 Quantum Amplitude Estimation Algorithm
 
-The algorithm:
-1. Prepare superposition encoding price distribution
-2. Encode payoff as amplitude
-3. Use phase estimation to extract the amplitude
+QAE achieves **quadratic speedup**: error $\propto 1/M$ with $M$ oracle queries.
 
-### 4.3 State Preparation
+**Algorithm outline:**
 
-Encode the risk-neutral distribution $p(S_T)$ in quantum amplitudes:
+1. **State preparation:** Encode the price distribution as quantum amplitudes:
+   $$|\psi\rangle = \sum_{i} \sqrt{p_i} |i\rangle$$
+   where $p_i$ is the probability of price $S_i$.
 
-$$|\psi\rangle = \sum_{i=0}^{2^n-1} \sqrt{p_i} |i\rangle$$
+2. **Payoff encoding:** Apply controlled rotation based on payoff:
+   $$|i\rangle|0\rangle \to |i\rangle \left( \sqrt{1 - f_i}|0\rangle + \sqrt{f_i}|1\rangle \right)$$
+   where $f_i = \text{payoff}(S_i) / \text{max\_payoff}$.
 
-where $|i\rangle$ represents discretized price bin $S_i$.
+3. **Amplitude estimation:** The amplitude of $|1\rangle$ on the ancilla is:
+   $$a = \sum_i p_i \cdot f_i = \mathbb{E}[\text{payoff}]$$
 
-For log-normal: $\ln S_T \sim \mathcal{N}\left(\ln S_0 + (r - \frac{\sigma^2}{2})T, \sigma^2 T\right)$
+4. **Phase estimation:** Use Grover iterations and QPE to estimate $a$ with error $O(1/M)$.
 
-### 4.4 Payoff Oracle
+### 4.3 Error Scaling Comparison
 
-Encode discounted payoff in ancilla qubit amplitude:
+| Method | Error | Queries for $\epsilon$ precision |
+|--------|-------|----------------------------------|
+| Classical MC | $O(1/\sqrt{N})$ | $N = O(1/\epsilon^2)$ |
+| Quantum AE | $O(1/M)$ | $M = O(1/\epsilon)$ |
 
-$$\mathcal{A}|i\rangle|0\rangle = |i\rangle \left( \sqrt{1 - f(S_i)}|0\rangle + \sqrt{f(S_i)}|1\rangle \right)$$
+**Quadratic speedup:** For precision $\epsilon = 0.01$:
+- Classical: ~10,000 samples
+- Quantum: ~100 queries
 
-where $f(S_i) = e^{-rT} \cdot \text{payoff}(S_i) / V_{\max}$ is the normalized payoff.
+### 4.4 Iterative QAE
 
-### 4.5 Error Bounds
+Standard QAE requires quantum phase estimation (many controlled operations). **Iterative QAE** (Grinko et al., 2019) avoids this:
 
-For canonical QAE with $M$ Grover iterations:
+1. Run Grover with $k$ iterations
+2. Measure and record outcomes
+3. Repeat with different $k$ values
+4. Use maximum likelihood estimation to combine results
 
-$$|\hat{a} - a| \leq \frac{\pi}{M} + \frac{\pi^2}{M^2}$$
+This is more suitable for near-term quantum hardware.
 
-where $a = |\langle\psi|1\rangle|^2$ is the amplitude encoding the option price.
+### 4.5 Resource Requirements
 
-**Iterative QAE [6]** achieves similar scaling without quantum phase estimation:
-
-$$\text{Error} = O\left(\frac{1}{M}\right), \quad \text{Queries} = O(M)$$
-
-### 4.6 Resource Requirements
-
-For practical option pricing with $\epsilon = 0.01\%$ relative error:
+For practical quantum advantage:
 
 | Resource | Estimate |
 |----------|----------|
-| Price qubits | 10-12 (1024-4096 price bins) |
-| Ancilla qubits | 1-2 (payoff encoding) |
-| QAE qubits | 8-10 (precision) |
-| Total qubits | ~20-25 |
-| Circuit depth | $O(10^4 - 10^5)$ gates |
+| Qubits (price discretization) | $n \approx 10-15$ |
+| Qubits (precision) | $m \approx 10-20$ |
+| Circuit depth | $O(2^m)$ Grover iterations |
+| Error correction | Required for $m > 10$ |
 
-**Practical crossover**: Requires fault-tolerant quantum computers; current NISQ devices have insufficient depth.
-
----
-
-## 5. Tensor Network Methods
-
-### 5.1 Matrix Product States (MPS)
-
-An MPS represents a function of $n$ variables as:
-
-$$f(x_1, \ldots, x_n) = \sum_{\alpha_1, \ldots, \alpha_{n-1}} A_1^{x_1}[\alpha_1] A_2^{x_2}[\alpha_1, \alpha_2] \cdots A_n^{x_n}[\alpha_{n-1}]$$
-
-where $A_i$ are tensors with bond dimension $D$ controlling expressivity.
-
-**Complexity**: $O(nD^2d)$ vs exponential $O(d^n)$ for full tensor.
-
-### 5.2 Application to Multi-Asset Options
-
-For a basket option on $n$ assets:
-
-$$V(S_1, \ldots, S_n, t) \approx \text{MPS}(S_1, \ldots, S_n, t)$$
-
-The MPS efficiently captures correlations if they decay with "distance" (asset index).
-
-### 5.3 Tree Tensor Networks (TTN)
-
-TTN arranges tensors hierarchically:
-
-```
-        [Root]
-       /      \
-    [T1]      [T2]
-    /  \      /  \
-  [L1][L2]  [L3][L4]
-```
-
-Naturally suited for multi-scale problems and hierarchical asset structures.
-
-### 5.4 Connection to Quantum Computing
-
-Tensor networks arise naturally in quantum computation:
-- Quantum states with limited entanglement are efficiently representable
-- MPS correspond to 1D quantum states with area-law entanglement
-- TTN generalize to tree-like entanglement structures
-
-**Key insight**: Some quantum advantages may be achievable classically via tensor networks.
+**Crossover point:** Quantum advantage requires fault-tolerant hardware, estimated at $10^3$-$10^6$ physical qubits depending on error rates.
 
 ---
 
-## References
+## 5. Key References
 
-[1] M. Raissi, P. Perdikaris, G.E. Karniadakis, "Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations," *Journal of Computational Physics*, 378:686-707, 2019. [arXiv:1711.10561](https://arxiv.org/abs/1711.10561)
+### PINNs
 
-[2] A. Pérez-Salinas, A. Cervera-Lierta, E. Gil-Fuster, J.I. Latorre, "Data re-uploading for a universal quantum classifier," *Quantum*, 4:226, 2020. [arXiv:1907.02085](https://arxiv.org/abs/1907.02085)
+1. **Raissi, M., Perdikaris, P., & Karniadakis, G. E.** (2019). Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations. *Journal of Computational Physics*, 378, 686-707.
+   - *Original PINN paper establishing the framework*
 
-[3] M. Schuld, R. Sweke, J.J. Meyer, "Effect of data encoding on the expressive power of variational quantum machine learning models," *Physical Review A*, 103:032430, 2021. [arXiv:2008.08605](https://arxiv.org/abs/2008.08605)
+2. **Wang, S., Teng, Y., & Perdikaris, P.** (2021). Understanding and mitigating gradient flow pathologies in physics-informed neural networks. *SIAM Journal on Scientific Computing*, 43(5), A3055-A3081.
+   - *Adaptive loss weighting and training stability*
 
-[4] J.R. McClean, S. Boixo, V.N. Smelyanskiy, R. Babbush, H. Neven, "Barren plateaus in quantum neural network training landscapes," *Nature Communications*, 9:4812, 2018. [arXiv:1803.11173](https://arxiv.org/abs/1803.11173)
+### Quantum Machine Learning
 
-[5] G. Brassard, P. Høyer, M. Mosca, A. Tapp, "Quantum Amplitude Amplification and Estimation," *Contemporary Mathematics*, 305:53-74, 2002. [arXiv:quant-ph/0005055](https://arxiv.org/abs/quant-ph/0005055)
+3. **Schuld, M., & Petruccione, F.** (2021). *Machine Learning with Quantum Computers*. Springer.
+   - *Comprehensive textbook on quantum ML*
 
-[6] D. Grinko, J. Gacon, C. Zoufal, S. Woerner, "Iterative quantum amplitude estimation," *npj Quantum Information*, 7:52, 2021. [arXiv:1912.05559](https://arxiv.org/abs/1912.05559)
+4. **Pérez-Salinas, A., Cervera-Lierta, A., Gil-Fuster, E., & Latorre, J. I.** (2020). Data re-uploading for a universal quantum classifier. *Quantum*, 4, 226.
+   - *Data re-uploading circuits for function approximation*
 
-[7] N. Stamatopoulos et al., "Option Pricing using Quantum Computers," *Quantum*, 4:291, 2020. [arXiv:1905.02666](https://arxiv.org/abs/1905.02666)
+5. **Schuld, M., Sweke, R., & Meyer, J. K.** (2021). Effect of data encoding on the expressive power of variational quantum-machine-learning models. *Physical Review A*, 103(3), 032430.
+   - *Fourier analysis of VQC expressivity*
 
-[8] M. Schuld and F. Petruccione, *Machine Learning with Quantum Computers*, Springer, 2021. ISBN: 978-3-030-83097-7
+### Quantum Finance
 
-[9] U. Schollwöck, "The density-matrix renormalization group in the age of matrix product states," *Annals of Physics*, 326:96-192, 2011. [arXiv:1008.3477](https://arxiv.org/abs/1008.3477)
+6. **Stamatopoulos, N., et al.** (2020). Option pricing using quantum computers. *Quantum*, 4, 291.
+   - *QAE for option pricing with detailed resource estimates*
 
-[10] F. Black and M. Scholes, "The Pricing of Options and Corporate Liabilities," *Journal of Political Economy*, 81(3):637-654, 1973.
+7. **Woerner, S., & Egger, D. J.** (2019). Quantum risk analysis. *npj Quantum Information*, 5(1), 15.
+   - *Quantum amplitude estimation for risk measures*
+
+8. **Grinko, D., Gacon, J., Zoufal, C., & Woerner, S.** (2021). Iterative quantum amplitude estimation. *npj Quantum Information*, 7(1), 52.
+   - *Practical QAE without QPE*
+
+### Tensor Networks
+
+9. **Orús, R.** (2014). A practical introduction to tensor networks: Matrix product states and projected entangled pair states. *Annals of Physics*, 349, 117-158.
+   - *Introduction to MPS and tensor network methods*
+
+10. **Stoudenmire, E., & Schwab, D. J.** (2016). Supervised learning with tensor networks. *Advances in Neural Information Processing Systems*, 29.
+    - *Tensor networks for machine learning*
+
+---
+
+## Appendix A: Notation Summary
+
+| Symbol | Meaning |
+|--------|---------|
+| $V(S, t)$ | Option value at spot $S$ and time $t$ |
+| $\sigma$ | Volatility |
+| $r$ | Risk-free rate |
+| $K$ | Strike price |
+| $T$ | Maturity |
+| $\tau = T - t$ | Time to maturity |
+| $N(\cdot)$ | Standard normal CDF |
+| $\mathcal{R}[\cdot]$ | PDE residual operator |
+| $\lambda$ | Loss weighting coefficients |
+| $\vert\psi\rangle$ | Quantum state |
+| $U(\theta)$ | Parameterized unitary |
+| $\sigma_x, \sigma_y, \sigma_z$ | Pauli matrices |
+
+## Appendix B: Useful Identities
+
+**Black-Scholes PDE from risk-neutral pricing:**
+
+$$V(S, t) = e^{-r(T-t)} \mathbb{E}^{\mathbb{Q}}[\text{payoff}(S_T) | S_t = S]$$
+
+Under $\mathbb{Q}$, the asset follows: $dS = rS\,dt + \sigma S\,dW^{\mathbb{Q}}$
+
+**Feynman-Kac formula:** Solutions to the Black-Scholes PDE equal risk-neutral expectations.
+
+**Quantum amplitude estimation error:**
+
+$$|\hat{a} - a| \leq \frac{\pi}{M} + \frac{\pi^2}{M^2}$$
+
+where $M$ is the number of Grover iterations.

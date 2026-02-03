@@ -6,13 +6,10 @@ import pytest
 import torch
 import torch.nn as nn
 
-import sys
-sys.path.insert(0, "/home/rylan/dev/personal/quantum-derivatives-trader/src")
-
-from classical.pinn import PINN, PINNTrainer
-from classical.networks import MLP, ResidualMLP
-from classical.losses import PINNLoss
-from pde.black_scholes import BSParams
+from src.classical.pinn import PINN, PINNTrainer
+from src.classical.networks import MLP, ResidualMLP
+from src.classical.losses import PINNLoss
+from src.pde.black_scholes import BSParams
 
 
 class TestPINNForwardPass:

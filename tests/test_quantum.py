@@ -6,15 +6,12 @@ import pytest
 import torch
 import numpy as np
 
-import sys
-sys.path.insert(0, "/home/rylan/dev/personal/quantum-derivatives-trader/src")
-
 # Skip all tests if pennylane is not available
 pennylane = pytest.importorskip("pennylane")
 
-from quantum.variational import QuantumLayer, create_vqc
-from quantum.hybrid_pinn import HybridPINN
-from quantum.amplitude_estimation import QuantumMonteCarloEstimator, QAEResult
+from src.quantum.variational import QuantumLayer, create_vqc
+from src.quantum.hybrid_pinn import HybridPINN
+from src.quantum.amplitude_estimation import QuantumMonteCarloEstimator, QAEResult
 
 
 class TestQuantumLayer:

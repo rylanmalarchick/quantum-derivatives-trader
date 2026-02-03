@@ -27,7 +27,7 @@ def create_vqc(n_qubits: int, n_layers: int, dev: qml.Device):
         QNode circuit function
     """
 
-    @qml.qnode(dev, interface="torch", diff_method="backprop")
+    @qml.qnode(dev, interface="torch", diff_method="adjoint")
     def circuit(inputs: torch.Tensor, weights: torch.Tensor):
         """
         Variational quantum circuit.
@@ -69,7 +69,7 @@ def create_data_reuploading_circuit(n_qubits: int, n_layers: int, dev: qml.Devic
     Reference: Pérez-Salinas et al., "Data re-uploading for a universal quantum classifier"
     """
 
-    @qml.qnode(dev, interface="torch", diff_method="backprop")
+    @qml.qnode(dev, interface="torch", diff_method="adjoint")
     def circuit(inputs: torch.Tensor, weights: torch.Tensor):
         """
         Args:
@@ -114,7 +114,7 @@ class QuantumLayer(nn.Module):
         self.n_qubits = n_qubits
         self.n_layers = n_layers
 
-        # Quantum device (use lightning for speed)
+        # Quantum device (use lightning for speed with adjoint diff)
         self.dev = qml.device("lightning.qubit", wires=n_qubits)
 
         # Choose circuit type
@@ -180,7 +180,7 @@ class MultiQubitMeasurement(nn.Module):
 
         self.dev = qml.device("lightning.qubit", wires=n_qubits)
 
-        @qml.qnode(self.dev, interface="torch", diff_method="backprop")
+        @qml.qnode(self.dev, interface="torch", diff_method="adjoint")
         def circuit(inputs, weights):
             # Encoding
             for i in range(n_qubits):

@@ -1,298 +1,362 @@
 # Project Roadmap: Quantum-Classical Hybrid PINNs for Derivatives Pricing
 
-This document outlines the six-phase development roadmap for exploring quantum-enhanced methods in financial derivatives pricing.
+This document outlines the implementation roadmap for exploring quantum computing approaches to financial derivatives pricing through physics-informed neural networks.
 
 ---
 
-## Phase 1: Classical PINN for Black-Scholes
+## Phase 1: Classical PINN for Black-Scholes (In Progress)
 
-**Status:** 🔄 In Progress
+**Status:** 🔄 In Progress  
+**Timeline:** Weeks 1-4
 
 ### Goals
 
-Establish a robust classical baseline using Physics-Informed Neural Networks to solve the Black-Scholes PDE for European options. This provides:
-- Ground truth for comparing quantum approaches
-- Validation of PINN methodology for option pricing
-- Baseline computational benchmarks
-
-### Technical Objectives
-
-1. **PDE Implementation**
-   - Black-Scholes residual: $$\frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + rS \frac{\partial V}{\partial S} - rV = 0$$
-   - Boundary conditions for European calls/puts
-   - Terminal condition: $$V(S, T) = \max(S - K, 0)$$ for calls
-
-2. **Network Architecture**
-   - Multi-layer perceptron with configurable depth/width
-   - Residual connections for deeper networks
-   - Input normalization for numerical stability
-
-3. **Training Pipeline**
-   - Collocation point sampling (interior, boundary, terminal)
-   - Weighted loss function: $$\mathcal{L} = \lambda_1 \mathcal{L}_{\text{PDE}} + \lambda_2 \mathcal{L}_{\text{BC}} + \lambda_3 \mathcal{L}_{\text{IC}}$$
-   - Adaptive learning rate scheduling
+1. Establish a robust classical baseline using Physics-Informed Neural Networks
+2. Validate PINN approach against analytical Black-Scholes solutions
+3. Build infrastructure for training, evaluation, and benchmarking
+4. Create reusable components for quantum extensions
 
 ### Milestones
 
 | Milestone | Description | Status |
 |-----------|-------------|--------|
-| M1.1 | PDE residual implementation with autodiff | ✅ Complete |
-| M1.2 | Analytical Black-Scholes for validation | ✅ Complete |
-| M1.3 | PINN architecture with MLP/ResNet | ✅ Complete |
-| M1.4 | Training loop with collocation sampling | ✅ Complete |
-| M1.5 | Greeks computation via autodiff | ✅ Complete |
-| M1.6 | Convergence analysis and hyperparameter tuning | 🔄 In Progress |
-| M1.7 | Comprehensive test suite | 🔄 In Progress |
+| M1.1 | Implement Black-Scholes PDE residual computation | ✅ Complete |
+| M1.2 | Build MLP and ResidualMLP architectures | ✅ Complete |
+| M1.3 | Implement PINN loss function (PDE + BC + IC) | ✅ Complete |
+| M1.4 | Create collocation point sampling strategies | ✅ Complete |
+| M1.5 | Train and validate against analytical solutions | 🔄 In Progress |
+| M1.6 | Implement adaptive loss weighting | ✅ Complete |
+| M1.7 | Add Greeks computation via autodiff | ✅ Complete |
 | M1.8 | Benchmark against finite difference methods | ⏳ Pending |
+
+### Deliverables
+
+- `src/classical/pinn.py` - PINN model and trainer
+- `src/classical/losses.py` - Loss functions with adaptive weighting
+- `src/pde/black_scholes.py` - PDE definition and analytical solutions
+- `src/pricing/pinn_pricer.py` - Pricing engine interface
+- `tests/test_classical_pinn.py` - Comprehensive test suite
+- `scripts/train_classical.py` - Training script with logging
 
 ### Success Criteria
 
-- Relative error < 1% vs analytical Black-Scholes across price range
-- Greeks (Delta, Gamma, Theta) within 5% of analytical values
-- Training convergence in < 5000 epochs
-- Documented performance vs finite difference and Monte Carlo
+- [ ] PINN achieves < 1% relative error vs analytical Black-Scholes
+- [ ] Greeks (delta, gamma, theta) within 2% of analytical values
+- [ ] Training converges within 5000 epochs
+- [ ] PDE residual < 1e-4 across domain
 
 ---
 
 ## Phase 2: Hybrid Quantum-Classical PINN
 
-**Status:** ⏳ Pending
+**Status:** ⏳ Pending  
+**Timeline:** Weeks 5-8
 
 ### Goals
 
-Replace the classical neural network with variational quantum circuits (VQCs) to explore whether quantum expressivity provides advantages for PDE solutions.
+1. Replace classical MLP with variational quantum circuits (VQC)
+2. Explore different quantum circuit architectures for function approximation
+3. Compare quantum expressivity with classical networks of similar parameter counts
+4. Identify regimes where hybrid models may offer advantages
 
-### Technical Objectives
+### Architecture Options
 
-1. **Variational Quantum Circuit Design**
-   - Hardware-efficient ansatz with trainable rotations
-   - Data re-uploading circuits for increased expressivity
-   - Ring and all-to-all entanglement topologies
+```
+Option A: Direct Replacement
+┌─────────────────────────────────────────────────────────────┐
+│  Input (S,t) → Normalize → VQC → Postprocess → V           │
+└─────────────────────────────────────────────────────────────┘
 
-2. **Hybrid Architecture**
-   - Classical preprocessing → Quantum circuit → Classical postprocessing
-   - Multiple quantum layer configurations (single, stacked, residual)
-   - Differentiable quantum-classical interface via PennyLane
+Option B: Quantum Residual
+┌─────────────────────────────────────────────────────────────┐
+│  Input → Classical MLP → V_classical                        │
+│       └→ VQC          → V_quantum   → V_classical + αV_q   │
+└─────────────────────────────────────────────────────────────┘
 
-3. **Input Encoding Strategies**
-   - Angle encoding: $$|x\rangle \rightarrow R_Y(\pi x)|0\rangle$$
-   - Amplitude encoding for higher-dimensional inputs
-   - Data re-uploading for enhanced function approximation
+Option C: Interleaved Layers
+┌─────────────────────────────────────────────────────────────┐
+│  Input → Classical → VQC → Classical → VQC → ... → Output  │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ### Milestones
 
 | Milestone | Description | Status |
 |-----------|-------------|--------|
-| M2.1 | Variational quantum circuit implementation | ⏳ Pending |
-| M2.2 | PennyLane integration with PyTorch | ⏳ Pending |
-| M2.3 | Single-layer hybrid PINN | ⏳ Pending |
-| M2.4 | Multi-layer hybrid architectures | ⏳ Pending |
-| M2.5 | Quantum residual correction model | ⏳ Pending |
-| M2.6 | Barren plateau analysis | ⏳ Pending |
-| M2.7 | Expressivity comparison with classical NNs | ⏳ Pending |
+| M2.1 | Implement hardware-efficient VQC ansatz | ✅ Complete |
+| M2.2 | Implement data re-uploading circuit | ✅ Complete |
+| M2.3 | Build HybridPINN with preprocessing/postprocessing | ✅ Complete |
+| M2.4 | Implement QuantumResidualPINN architecture | ✅ Complete |
+| M2.5 | Train hybrid models on Black-Scholes | ⏳ Pending |
+| M2.6 | Compare expressivity vs parameter count | ⏳ Pending |
+| M2.7 | Analyze barren plateau effects | ⏳ Pending |
+| M2.8 | Document optimal circuit configurations | ⏳ Pending |
 
-### Research Questions
+### Deliverables
 
-- Does the quantum circuit's expressivity help approximate option pricing functions?
-- What is the optimal circuit depth vs. trainability trade-off?
-- How do barren plateaus affect convergence for financial PDEs?
-- At what problem size does quantum advantage potentially emerge?
+- `src/quantum/variational.py` - VQC implementations
+- `src/quantum/hybrid_pinn.py` - Hybrid model architectures
+- `scripts/train_hybrid.py` - Hybrid training script
+- `notebooks/quantum_expressivity.ipynb` - Expressivity analysis
+
+### Success Criteria
+
+- [ ] Hybrid PINN achieves comparable accuracy to classical with fewer parameters
+- [ ] Identify optimal qubit count and layer depth for 2D input problems
+- [ ] Characterize training dynamics (convergence, variance, barren plateaus)
 
 ---
 
 ## Phase 3: Quantum Amplitude Estimation
 
-**Status:** ⏳ Pending
+**Status:** ⏳ Pending  
+**Timeline:** Weeks 9-12
 
 ### Goals
 
-Implement Quantum Amplitude Estimation (QAE) for Monte Carlo option pricing, achieving the theoretical $$O(1/\epsilon)$$ vs classical $$O(1/\epsilon^2)$$ speedup.
+1. Implement Quantum Amplitude Estimation for Monte Carlo pricing
+2. Demonstrate quadratic speedup scaling O(1/N) vs O(1/√N)
+3. Compare with classical Monte Carlo for various precision targets
+4. Analyze resource requirements for practical quantum advantage
 
-### Technical Objectives
+### Algorithm Overview
 
-1. **State Preparation**
-   - Encode log-normal distribution in quantum amplitudes
-   - Efficient preparation circuits for financial distributions
-   - Multi-asset distribution encoding
+```
+Classical MC:    Error ~ O(1/√N)  →  N samples for precision ε
+Quantum AE:      Error ~ O(1/M)   →  M queries for precision ε
 
-2. **Payoff Oracle**
-   - Encode payoff function as controlled rotations
-   - European, Asian, and barrier option payoffs
-   - Comparator circuits for digital payoffs
-
-3. **Amplitude Estimation Variants**
-   - Canonical QAE with phase estimation
-   - Iterative QAE (no QPE required)
-   - Maximum likelihood amplitude estimation
+Speedup: M² = N  →  Quadratic reduction in oracle calls
+```
 
 ### Milestones
 
 | Milestone | Description | Status |
 |-----------|-------------|--------|
-| M3.1 | Log-normal state preparation | ⏳ Pending |
-| M3.2 | Payoff rotation encoding | ⏳ Pending |
-| M3.3 | Canonical QAE implementation | ⏳ Pending |
-| M3.4 | Iterative QAE variant | ⏳ Pending |
-| M3.5 | Error bound verification | ⏳ Pending |
-| M3.6 | Resource estimation for practical problems | ⏳ Pending |
-| M3.7 | Comparison with classical Monte Carlo | ⏳ Pending |
+| M3.1 | Implement log-normal distribution encoding | ✅ Complete |
+| M3.2 | Implement payoff-as-rotation encoding | ✅ Complete |
+| M3.3 | Build basic QAE estimator | ✅ Complete |
+| M3.4 | Implement Iterative QAE (no QPE) | ✅ Complete |
+| M3.5 | Simulate QAE for European options | ⏳ Pending |
+| M3.6 | Compare precision vs query complexity | ⏳ Pending |
+| M3.7 | Estimate fault-tolerant resource requirements | ⏳ Pending |
+| M3.8 | Extend to path-dependent options | ⏳ Pending |
 
-### Key Metrics
+### Deliverables
 
-- Query complexity vs classical sample complexity
-- Circuit depth requirements
-- Qubit count scaling with precision
-- Practical crossover point estimation
+- `src/quantum/amplitude_estimation.py` - QAE implementations
+- `notebooks/qae_speedup_analysis.ipynb` - Speedup analysis
+- Comparison table: Classical MC vs QAE for various precisions
+
+### Success Criteria
+
+- [ ] Demonstrate O(1/N) error scaling in simulation
+- [ ] Estimate crossover point for practical quantum advantage
+- [ ] Characterize qubit requirements vs precision
 
 ---
 
 ## Phase 4: Heston & Exotic Options
 
-**Status:** ⏳ Pending
+**Status:** ⏳ Pending  
+**Timeline:** Weeks 13-16
 
 ### Goals
 
-Extend PINNs to handle the Heston stochastic volatility model and exotic options with path-dependent features.
+1. Extend PINNs to stochastic volatility (Heston model)
+2. Implement barrier and Asian option pricing
+3. Handle path-dependent features in PINN framework
+4. Explore quantum advantages for higher-dimensional PDEs
 
-### Technical Objectives
+### Heston Model PDE
 
-1. **Heston Model PDE**
-   $$\frac{\partial V}{\partial t} + \frac{1}{2}vS^2\frac{\partial^2 V}{\partial S^2} + \rho\xi vS\frac{\partial^2 V}{\partial S \partial v} + \frac{1}{2}\xi^2 v\frac{\partial^2 V}{\partial v^2} + rS\frac{\partial V}{\partial S} + \kappa(\theta - v)\frac{\partial V}{\partial v} - rV = 0$$
+The Heston model is a 2D PDE in (S, v) with coupled dynamics:
 
-2. **Exotic Options**
-   - Barrier options (up-and-out, down-and-in, etc.)
-   - Asian options (arithmetic and geometric average)
-   - Lookback options
-
-3. **Technical Challenges**
-   - 2D PDE with mixed derivatives
-   - Non-smooth boundary conditions
-   - Path-dependent payoffs requiring augmented state space
+```
+∂V/∂t + ½σ²S²∂²V/∂S² + ρσνS∂²V/∂S∂v + ½ν²v∂²V/∂v² 
+      + rS∂V/∂S + κ(θ-v)∂V/∂v - rV = 0
+```
 
 ### Milestones
 
 | Milestone | Description | Status |
 |-----------|-------------|--------|
-| M4.1 | Heston PDE residual with mixed derivatives | ⏳ Pending |
-| M4.2 | Classical PINN for Heston | ⏳ Pending |
-| M4.3 | Hybrid quantum PINN for 2D PDE | ⏳ Pending |
-| M4.4 | Barrier option boundary handling | ⏳ Pending |
-| M4.5 | Asian option with path augmentation | ⏳ Pending |
-| M4.6 | Calibration to market data | ⏳ Pending |
+| M4.1 | Implement Heston PDE residual | ✅ Complete |
+| M4.2 | Extend PINN to 3D input (S, v, t) | ⏳ Pending |
+| M4.3 | Implement barrier option boundary conditions | ⏳ Pending |
+| M4.4 | Implement Asian option averaging | ⏳ Pending |
+| M4.5 | Train PINN on Heston model | ⏳ Pending |
+| M4.6 | Implement jump-diffusion (Merton model) | ✅ Complete |
+| M4.7 | Benchmark against Monte Carlo | ⏳ Pending |
+
+### Deliverables
+
+- `src/pde/heston.py` - Heston PDE implementation
+- `src/pde/jump_diffusion.py` - Jump-diffusion models
+- Extended pricing engine for exotic options
+- Comparative analysis: PINN vs MC for exotics
+
+### Success Criteria
+
+- [ ] Heston PINN within 2% of Monte Carlo benchmark
+- [ ] Barrier option pricing handles discontinuous payoffs
+- [ ] Demonstrate PINN advantages for high-dimensional problems
 
 ---
 
 ## Phase 5: Tensor Network Methods
 
-**Status:** ⏳ Pending
+**Status:** ⏳ Pending  
+**Timeline:** Weeks 17-20
 
 ### Goals
 
-Implement quantum-inspired tensor network methods (MPS, TTN) for high-dimensional option pricing, particularly multi-asset derivatives.
+1. Implement Matrix Product States (MPS) for multi-asset options
+2. Explore Tree Tensor Networks (TTN) for hierarchical problems
+3. Compare tensor network methods with quantum approaches
+4. Identify use cases where tensor networks excel
 
-### Technical Objectives
+### Tensor Network Structures
 
-1. **Matrix Product States (MPS)**
-   - Efficient representation of multi-variate functions
-   - Bond dimension control for accuracy/speed trade-off
-   - Variational optimization of MPS parameters
+```
+Matrix Product State (MPS):
+○─○─○─○─○─○  (linear chain, good for 1D correlations)
 
-2. **Tree Tensor Networks (TTN)**
-   - Hierarchical decomposition for multi-scale problems
-   - Natural handling of asset correlation structures
-   - Efficient contraction algorithms
-
-3. **Applications**
-   - Basket options with many underlyings
-   - Rainbow options (best-of, worst-of)
-   - High-dimensional American options
+Tree Tensor Network (TTN):
+    ○           (hierarchical, good for multi-scale)
+   / \
+  ○   ○
+ / \ / \
+○  ○ ○  ○
+```
 
 ### Milestones
 
 | Milestone | Description | Status |
 |-----------|-------------|--------|
-| M5.1 | MPS representation layer | ⏳ Pending |
-| M5.2 | TTN architecture | ⏳ Pending |
-| M5.3 | Tensor train optimization | ⏳ Pending |
-| M5.4 | Multi-asset basket pricing | ⏳ Pending |
-| M5.5 | Comparison with classical methods | ⏳ Pending |
-| M5.6 | Scaling analysis | ⏳ Pending |
+| M5.1 | Implement MPS contraction | ✅ Complete |
+| M5.2 | Implement differentiable MPS layer | ✅ Complete |
+| M5.3 | Implement Tree Tensor Network | ✅ Complete |
+| M5.4 | Implement Tensor Train for multi-asset pricing | ✅ Complete |
+| M5.5 | Train MPS-based PINN for basket options | ⏳ Pending |
+| M5.6 | Compare expressivity: MPS vs VQC | ⏳ Pending |
+| M5.7 | Benchmark computational scaling | ⏳ Pending |
 
-### Research Questions
+### Deliverables
 
-- How does MPS bond dimension relate to option complexity?
-- Can TTN naturally capture asset correlation structures?
-- What is the practical dimensionality limit?
-- Comparison with Monte Carlo for n > 10 assets?
+- `src/quantum/tensor_network.py` - MPS, TTN implementations
+- Basket option pricer using tensor networks
+- Scaling analysis: complexity vs number of assets
+
+### Success Criteria
+
+- [ ] Tensor networks scale polynomially with number of assets
+- [ ] Achieve comparable accuracy to Monte Carlo for 10+ asset options
+- [ ] Characterize bond dimension requirements
 
 ---
 
 ## Phase 6: Benchmarks & Analysis
 
-**Status:** ⏳ Pending
+**Status:** ⏳ Pending  
+**Timeline:** Weeks 21-24
 
 ### Goals
 
-Comprehensive comparison of all implemented methods with rigorous statistical analysis and practical recommendations.
+1. Comprehensive comparison of all implemented methods
+2. Publish benchmark results and analysis
+3. Document best practices and recommendations
+4. Identify promising directions for future research
 
-### Technical Objectives
+### Comparison Dimensions
 
-1. **Benchmark Suite**
-   - Standardized test cases across methods
-   - Multiple option types and market conditions
-   - Varying precision requirements
-
-2. **Metrics**
-   - Accuracy (relative error, Greeks error)
-   - Computational cost (time, memory, circuit depth)
-   - Scalability (dimension, precision, time-to-solution)
-   - Robustness (market condition sensitivity)
-
-3. **Analysis**
-   - Crossover point analysis for quantum advantage
-   - Resource estimation for real quantum hardware
-   - Practical deployment recommendations
+| Dimension | Methods Compared |
+|-----------|-----------------|
+| Accuracy | Classical PINN, Hybrid PINN, Analytical, MC, FD |
+| Speed | Training time, inference time, convergence rate |
+| Scalability | Dimension scaling, parameter efficiency |
+| Greeks | Autodiff quality, numerical stability |
+| Exotic Options | Barrier, Asian, basket, lookback |
 
 ### Milestones
 
 | Milestone | Description | Status |
 |-----------|-------------|--------|
-| M6.1 | Unified benchmarking framework | ⏳ Pending |
-| M6.2 | European option benchmark suite | ⏳ Pending |
-| M6.3 | Exotic option benchmark suite | ⏳ Pending |
-| M6.4 | Multi-asset benchmark suite | ⏳ Pending |
-| M6.5 | Statistical analysis and visualization | ⏳ Pending |
-| M6.6 | Research paper / report | ⏳ Pending |
+| M6.1 | Design comprehensive benchmark suite | ⏳ Pending |
+| M6.2 | Run all methods on standard test cases | ⏳ Pending |
+| M6.3 | Statistical analysis of results | ⏳ Pending |
+| M6.4 | Generate publication-quality figures | ⏳ Pending |
+| M6.5 | Write analysis report | ⏳ Pending |
+| M6.6 | Document recommendations | ⏳ Pending |
 
 ### Deliverables
 
-- Benchmark data and analysis notebooks
-- Performance comparison tables and figures
-- Guidelines for method selection based on use case
-- Open-source release with documentation
+- `scripts/benchmark.py` - Comprehensive benchmark suite
+- `docs/benchmark_results.md` - Results and analysis
+- Publication-ready figures and tables
+- Recommendations document
+
+### Research Questions to Answer
+
+1. **Does quantum circuit expressivity help for PDE solutions?**
+   - Compare parameter efficiency of VQC vs MLP
+   - Analyze function approximation quality
+
+2. **Where does hybrid outperform pure classical?**
+   - Identify problem regimes favoring quantum
+   - Characterize breakeven points
+
+3. **What's the practical crossover point for QAE advantage?**
+   - Resource estimation for fault-tolerant QAE
+   - Compare with optimized classical MC
+
+4. **Can tensor networks achieve similar benefits classically?**
+   - Compare MPS with VQC for expressivity
+   - Analyze computational overhead
 
 ---
 
-## Timeline & Dependencies
+## Dependencies & Prerequisites
+
+### Software Requirements
 
 ```
-Phase 1 ──────────────►
-         │
-         ├──► Phase 2 ──────────────►
-         │             │
-         │             └──► Phase 3 ─────────►
-         │                          │
-         └──► Phase 4 ──────────────┤
-                       │            │
-                       └──► Phase 5 ┤
-                                    │
-                                    └──► Phase 6
+Python >= 3.10
+PyTorch >= 2.0
+PennyLane >= 0.32
+NumPy, SciPy
+Matplotlib, Plotly (visualization)
+pytest (testing)
 ```
 
-**Estimated Timeline:**
-- Phase 1: Weeks 1-4
-- Phase 2: Weeks 3-8
-- Phase 3: Weeks 6-10
-- Phase 4: Weeks 8-14
-- Phase 5: Weeks 12-18
-- Phase 6: Weeks 16-20
+### Hardware Recommendations
+
+- **Classical Training:** GPU recommended (CUDA support)
+- **Quantum Simulation:** 8-12 qubits feasible on CPU
+- **Tensor Networks:** Memory scales with bond dimension²
+
+---
+
+## Risk Mitigation
+
+| Risk | Mitigation |
+|------|------------|
+| Barren plateaus in VQC | Use layerwise training, local observables |
+| PINN training instability | Adaptive loss weighting, learning rate scheduling |
+| Quantum simulation overhead | Limit qubit count, use efficient backends |
+| Tensor network scaling | Cap bond dimension, use compression |
+
+---
+
+## Timeline Summary
+
+```
+Weeks 1-4:   Phase 1 - Classical PINN ████████████████████
+Weeks 5-8:   Phase 2 - Hybrid PINN   ░░░░░░░░░░░░░░░░░░░░
+Weeks 9-12:  Phase 3 - QAE           ░░░░░░░░░░░░░░░░░░░░
+Weeks 13-16: Phase 4 - Heston/Exotic ░░░░░░░░░░░░░░░░░░░░
+Weeks 17-20: Phase 5 - Tensor Nets   ░░░░░░░░░░░░░░░░░░░░
+Weeks 21-24: Phase 6 - Benchmarks    ░░░░░░░░░░░░░░░░░░░░
+
+████ = Complete/In Progress
+░░░░ = Pending
+```

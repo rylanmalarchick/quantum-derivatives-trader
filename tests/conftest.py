@@ -6,10 +6,7 @@ import pytest
 import torch
 import numpy as np
 
-import sys
-sys.path.insert(0, "/home/rylan/dev/personal/quantum-derivatives-trader/src")
-
-from pde.black_scholes import BSParams
+from src.pde.black_scholes import BSParams
 
 
 @pytest.fixture
