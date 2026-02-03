@@ -38,7 +38,7 @@ from src.classical.pinn import PINN, PINNTrainer
 from src.pde.black_scholes import BSParams, bs_analytical
 from src.pricing.analytical import AnalyticalPricer
 from src.data.collocation import create_grid, generate_collocation_points
-from src.classical.losses import PINNLoss
+from src.classical.losses import PINNLoss, MoneynessWeightedLoss, LogPriceLoss
 from src.utils.visualization import (
     plot_training_history,
     plot_comparison,
@@ -109,6 +109,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lambda_pde", type=float, default=1.0, help="PDE loss weight")
     parser.add_argument("--lambda_bc", type=float, default=10.0, help="Boundary condition loss weight")
     parser.add_argument("--lambda_ic", type=float, default=10.0, help="Terminal condition loss weight")
+    parser.add_argument("--loss_type", type=str, default="standard", choices=["standard", "weighted", "log"], help="Loss function type")
 
     # Comparison with classical
     parser.add_argument(
@@ -190,6 +191,7 @@ class HybridPINNTrainer:
         lambda_pde: float = 1.0,
         lambda_bc: float = 10.0,
         lambda_ic: float = 10.0,
+        loss_type: str = "standard",
     ):
         self.model = model
         self.params = params
@@ -204,12 +206,33 @@ class HybridPINNTrainer:
 
         self.history = {"total": [], "pde": [], "bc": [], "ic": [], "time_per_epoch": []}
 
-        self.loss_fn = PINNLoss(
-            params,
-            lambda_pde=lambda_pde,
-            lambda_bc=lambda_bc,
-            lambda_ic=lambda_ic,
-        )
+        # Select loss function based on type
+        if loss_type == "weighted":
+            self.loss_fn = MoneynessWeightedLoss(
+                params,
+                K=params.K,
+                otm_weight=10.0,
+                atm_weight=5.0,
+                itm_weight=1.0,
+                lambda_pde=lambda_pde,
+                lambda_bc=lambda_bc,
+                lambda_ic=lambda_ic,
+            )
+        elif loss_type == "log":
+            self.loss_fn = LogPriceLoss(
+                params,
+                epsilon=0.1,
+                lambda_pde=lambda_pde,
+                lambda_bc=lambda_bc,
+                lambda_ic=lambda_ic,
+            )
+        else:
+            self.loss_fn = PINNLoss(
+                params,
+                lambda_pde=lambda_pde,
+                lambda_bc=lambda_bc,
+                lambda_ic=lambda_ic,
+            )
 
     def train_step(
         self,
@@ -344,6 +367,7 @@ def train_classical_for_comparison(
         lambda_pde=args.lambda_pde,
         lambda_bc=args.lambda_bc,
         lambda_ic=args.lambda_ic,
+        loss_type=args.loss_type,
     )
 
     start_time = time.time()
@@ -550,6 +574,7 @@ def main():
         lambda_pde=args.lambda_pde,
         lambda_bc=args.lambda_bc,
         lambda_ic=args.lambda_ic,
+        loss_type=args.loss_type,
     )
 
     # Train hybrid model

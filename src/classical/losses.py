@@ -223,3 +223,166 @@ class AdaptiveWeightedLoss(PINNLoss):
         self.lambda_pde = self.running_max_grad["pde"]
         self.lambda_bc = self.running_max_grad["bc"]
         self.lambda_ic = self.running_max_grad["ic"]
+
+
+class MoneynessWeightedLoss(PINNLoss):
+    """
+    PINN loss with moneyness-based weighting.
+    
+    Addresses the issue where models perform poorly on OTM options 
+    (near-zero values) by weighting samples inversely to option value.
+    
+    Key insight: MSE naturally weights ITM options more heavily because
+    errors there are larger in absolute terms. This loss function 
+    rebalances to give OTM options more weight.
+    """
+    
+    def __init__(
+        self,
+        params: BSParams,
+        K: float = 100.0,
+        otm_weight: float = 10.0,
+        atm_weight: float = 5.0,
+        itm_weight: float = 1.0,
+        use_relative_error: bool = False,
+        **kwargs,
+    ):
+        """
+        Args:
+            params: Black-Scholes parameters
+            K: Strike price for determining moneyness
+            otm_weight: Weight multiplier for OTM options (S/K < 0.95)
+            atm_weight: Weight multiplier for ATM options (0.95 <= S/K <= 1.05)
+            itm_weight: Weight multiplier for ITM options (S/K > 1.05)
+            use_relative_error: If True, use relative error for terminal loss
+        """
+        super().__init__(params, **kwargs)
+        self.K = K
+        self.otm_weight = otm_weight
+        self.atm_weight = atm_weight
+        self.itm_weight = itm_weight
+        self.use_relative_error = use_relative_error
+    
+    def _compute_weights(self, S: torch.Tensor) -> torch.Tensor:
+        """Compute sample weights based on moneyness."""
+        moneyness = S / self.K
+        weights = torch.ones_like(S)
+        
+        # OTM: S/K < 0.95
+        otm_mask = moneyness < 0.95
+        weights[otm_mask] = self.otm_weight
+        
+        # ATM: 0.95 <= S/K <= 1.05
+        atm_mask = (moneyness >= 0.95) & (moneyness <= 1.05)
+        weights[atm_mask] = self.atm_weight
+        
+        # ITM: S/K > 1.05
+        itm_mask = moneyness > 1.05
+        weights[itm_mask] = self.itm_weight
+        
+        return weights
+    
+    def terminal_loss(
+        self,
+        model: torch.nn.Module,
+        S: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Weighted terminal condition loss.
+        
+        Optionally uses relative error to handle the wide range of option values.
+        """
+        t_T = torch.full_like(S, self.params.T)
+        V = model(S, t_T)
+        
+        if self.option_type == "call":
+            payoff = torch.relu(S - self.params.K)
+        else:
+            payoff = torch.relu(self.params.K - S)
+        
+        weights = self._compute_weights(S)
+        
+        if self.use_relative_error:
+            # Relative error with small epsilon for stability
+            epsilon = 0.1  # Min price threshold
+            rel_error = (V - payoff) ** 2 / (payoff.abs() + epsilon) ** 2
+            return (weights * rel_error).mean()
+        else:
+            # Weighted MSE
+            return (weights * (V - payoff) ** 2).mean()
+    
+    def __call__(
+        self,
+        model: torch.nn.Module,
+        S_interior: torch.Tensor,
+        t_interior: torch.Tensor,
+        S_boundary: torch.Tensor,
+        t_boundary: torch.Tensor,
+        S_terminal: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
+        """Compute weighted loss components."""
+        losses = {}
+        
+        # PDE residual loss (weighted by moneyness at interior points)
+        residual = self.pde_residual(model, S_interior, t_interior)
+        weights = self._compute_weights(S_interior)
+        losses["pde"] = self.lambda_pde * (weights * residual ** 2).mean()
+        
+        # Boundary condition loss (unweighted - already focused on extremes)
+        losses["bc"] = self.lambda_bc * self.boundary_loss(
+            model, S_boundary, t_boundary
+        )
+        
+        # Terminal condition loss (weighted)
+        losses["ic"] = self.lambda_ic * self.terminal_loss(model, S_terminal)
+        
+        # Total loss
+        losses["total"] = losses["pde"] + losses["bc"] + losses["ic"]
+        
+        return losses
+
+
+class LogPriceLoss(PINNLoss):
+    """
+    PINN loss that works in log-price space.
+    
+    Key insight: Option prices span many orders of magnitude.
+    Training on log(V + epsilon) makes gradients more uniform.
+    
+    This is especially useful for the terminal condition, where
+    the payoff can range from 0 to 100+.
+    """
+    
+    def __init__(
+        self,
+        params: BSParams,
+        epsilon: float = 0.1,
+        **kwargs,
+    ):
+        """
+        Args:
+            params: Black-Scholes parameters
+            epsilon: Small offset to handle log(0)
+        """
+        super().__init__(params, **kwargs)
+        self.epsilon = epsilon
+    
+    def terminal_loss(
+        self,
+        model: torch.nn.Module,
+        S: torch.Tensor,
+    ) -> torch.Tensor:
+        """Terminal condition in log-price space."""
+        t_T = torch.full_like(S, self.params.T)
+        V = model(S, t_T)
+        
+        if self.option_type == "call":
+            payoff = torch.relu(S - self.params.K)
+        else:
+            payoff = torch.relu(self.params.K - S)
+        
+        # Log transform with offset
+        log_V = torch.log(V.abs() + self.epsilon)
+        log_payoff = torch.log(payoff + self.epsilon)
+        
+        return ((log_V - log_payoff) ** 2).mean()
