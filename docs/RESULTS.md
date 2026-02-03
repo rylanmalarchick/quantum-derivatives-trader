@@ -70,78 +70,149 @@ Epoch 1000: total=1665.28,  pde=3.09,  bc=0.06, ic=1662.13
 
 ---
 
-### Experiment 2: Quantum-Classical Hybrid
+### Experiment 2: Quantum-Classical Hybrid (Quick Test)
 
 **Date**: 2025-02-02  
-**Status**: IN PROGRESS
+**Commit**: `aa9a1b7`
 
 #### Configuration
 
 | Parameter | Value |
 |-----------|-------|
-| Qubits | 4 |
-| VQC Layers | 3 |
+| Qubits | 2 |
+| VQC Layers | 2 |
 | Circuit Type | Hardware-efficient |
 | Diff Method | Adjoint |
-| Epochs | 500 |
-| Learning Rate | 1e-3 |
+| Classical Hidden | 32 |
+| Epochs | 100 |
+| Learning Rate | 5e-3 |
+| Interior Points | 100 |
+| Boundary Points | 50 |
+| Terminal Points | 50 |
 
 #### Results
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| **MSE** | TBD | |
-| **Training Time** | ~hours | Quantum simulation is expensive |
-| **Quantum Parameters** | 36 | 4 qubits × 3 layers × 3 rotations |
-| **Total Parameters** | ~5000 | Including classical encoder/decoder |
+| **MSE** | 11.37 | **21x better than classical!** |
+| **MAE** | 3.02 | **2.7x better than classical** |
+| **Max Abs Error** | 6.84 | **7x better than classical** |
+| **Mean Rel Error** | 150.95% | Worse (poor OTM performance) |
+| **RMSE** | 3.37 | **4.7x better than classical** |
+| **Training Time** | 94.1s | ~1s/epoch (vs 30ms classical) |
+| **Total Parameters** | 271 | **47x fewer than classical!** |
+
+#### Training Dynamics
+
+```
+Epoch   0: total=17060.05, pde=0.02, bc=0.00, ic=17060.03, time=0.74s
+Epoch  50: total=963.59,   pde=10.64, bc=0.00, ic=952.96,  time=0.86s
+Epoch 100: total=106.84 (final)
+```
+
+**Key Observations**:
+1. **Better absolute accuracy** (MSE 11 vs 247) despite only 100 epochs
+2. **High relative error** indicates poor performance in low-value (OTM) regions
+3. **Much slower training** (~30x) due to quantum simulation overhead
+4. **Parameter efficiency**: Achieves better MSE with 47x fewer parameters
+5. **Faster convergence**: Loss drops from 17k to 107 in just 100 epochs
+
+#### Artifacts
+
+- Results: `outputs/hybrid/20260202_214400/`
+- Checkpoint: `outputs/hybrid/20260202_214400/hybrid_pinn_checkpoint.pt`
 
 ---
 
 ## Comparison Summary
 
-| Model | MSE | MAE | Training Time | Parameters |
-|-------|-----|-----|---------------|------------|
-| Classical PINN | 247.34 | 8.25 | ~30s | 12,737 |
-| Hybrid Quantum | TBD | TBD | TBD | ~5,000 |
-| Finite Difference | <0.5 | <0.5 | ~1s | N/A |
-| Monte Carlo (100k) | ~0.1 | ~0.2 | ~2s | N/A |
+| Model | MSE | MAE | Rel. Error | Time | Parameters |
+|-------|-----|-----|------------|------|------------|
+| Classical PINN | 247.34 | 8.25 | 27.66% | ~30s | 12,737 |
+| **Hybrid Quantum** | **11.37** | **3.02** | 150.95% | 94s | **271** |
+| Finite Difference | <0.5 | <0.5 | <0.5% | ~1s | N/A |
+| Monte Carlo (100k) | ~0.1 | ~0.2 | <0.5% | ~2s | N/A |
+
+**Key Finding**: The hybrid model achieves **21x better MSE with 47x fewer parameters**, 
+but struggles with relative error in low-value regions. This suggests the quantum circuit
+provides good expressivity for the bulk of the pricing surface but may need:
+- Better loss weighting for OTM regions
+- More training epochs
+- Importance sampling near boundaries
+
+---
+
+## Convergence Analysis
+
+Convergence plots available in `outputs/analysis/`:
+- `convergence_comparison.png` - Training loss over epochs
+- `loss_components.png` - PDE/BC/IC loss breakdown
+- `accuracy_comparison.png` - Final metric comparison
+- `time_per_epoch.png` - Computational cost analysis
 
 ---
 
 ## Observations & Insights
 
-### Why Classical PINN Has High Error
+### Why Hybrid Outperforms Classical on MSE
 
-1. **Loss balancing**: Terminal condition dominates; may need adaptive weighting
-2. **Collocation sampling**: Uniform sampling may miss important regions (near strike)
-3. **Training duration**: 1000 epochs may be insufficient
-4. **Network capacity**: 4×64 may be undersized for the pricing surface
+1. **Parameter efficiency**: Quantum circuits provide expressive power with fewer parameters
+2. **Inductive bias**: The entangling structure may better capture option pricing dynamics
+3. **Optimization landscape**: Smaller parameter space may be easier to optimize
+
+### Why Hybrid Has Higher Relative Error
+
+1. **OTM options have near-zero prices**: Relative error explodes for small denominators
+2. **Loss function doesn't weight by relative importance**: Focuses on MSE
+3. **Limited training data near boundaries**: Uniform sampling misses extreme regions
 
 ### Potential Improvements
 
-1. **Adaptive loss weighting** (learn λ values during training)
-2. **Importance sampling** for collocation points (more near ATM)
-3. **Curriculum learning** (start with simple, increase complexity)
-4. **Larger network** or **Fourier features** for high-frequency content
-5. **Longer training** with learning rate scheduling
+1. **Weighted MSE** (upweight OTM regions where prices are small)
+2. **More qubits** (test 4, 6, 8 qubits for expressivity)
+3. **Longer training** (500+ epochs)
+4. **Data reuploading** circuit architecture
+5. **GPU acceleration** with `lightning.gpu` backend
 
-### Quantum-Specific Considerations
+---
 
-1. **Barren plateaus**: Random initialization may lead to vanishing gradients
-2. **Expressivity vs trainability**: More layers = more expressive but harder to train
-3. **Simulation overhead**: Each forward pass is O(2^n), limiting qubit count
-4. **Adjoint differentiation**: Enables gradients but constrains circuit structure
+## Compute Infrastructure Insights
+
+From profiled training (`scripts/train_profiled.py`):
+
+### Classical PINN Timing Breakdown
+```
+backward_pass        30.7% (28.6s)
+forward_pass         27.0% (25.2s)
+optimizer_step       13.4% (12.4s)
+data_generation      10.9% (10.2s)
+```
+
+### Hybrid PINN Timing Breakdown  
+```
+forward_pass         64.2% (34.5s)  ← Quantum bottleneck!
+backward_pass        10.2% (5.5s)
+data_generation       4.5% (2.4s)
+optimizer_step        4.5% (2.4s)
+```
+
+**Key insight**: The quantum forward pass dominates hybrid training time. 
+Optimization should focus on:
+- Batched circuit evaluation
+- GPU-accelerated simulation
+- Circuit depth reduction
 
 ---
 
 ## Next Experiments
 
-- [ ] Classical PINN with 5000 epochs and LR scheduling
-- [ ] Classical PINN with adaptive loss weighting
-- [ ] Hybrid with 6 qubits (compare expressivity)
-- [ ] Hybrid with data-reuploading circuit
-- [ ] Convergence analysis: error vs collocation points
-- [ ] Convergence analysis: error vs VQC depth
+- [x] Classical PINN baseline
+- [x] Hybrid quantum (2 qubits, 2 layers, 100 epochs)
+- [ ] Hybrid with 4 qubits, 500 epochs
+- [ ] Classical PINN with 5000 epochs (convergence parity)
+- [ ] Hybrid with weighted loss (improve rel. error)
+- [ ] Scaling analysis: error vs qubit count
+- [ ] Scaling analysis: error vs VQC depth
 
 ---
 
@@ -151,10 +222,17 @@ All experiments can be reproduced with:
 
 ```bash
 # Classical baseline
-python scripts/train_classical.py --epochs 1000 --lr 1e-3 --seed 42
+python scripts/train_classical.py --epochs 1000 --lr 1e-3
 
-# Quantum hybrid
-python scripts/train_hybrid.py --epochs 500 --n-qubits 4 --n-layers 3 --seed 42
+# Quick hybrid test
+python scripts/train_hybrid.py --epochs 100 --n_qubits 2 --n_layers 2
+
+# Profiled training (with timing breakdown)
+python scripts/train_profiled.py --epochs 100 --model classical
+python scripts/train_profiled.py --epochs 50 --model hybrid --n_qubits 2
+
+# Convergence analysis (generates comparison plots)
+python notebooks/02_convergence_analysis.py
 ```
 
-Random seeds are fixed for reproducibility. Hardware: CPU-only simulation.
+Hardware: CPU-only simulation (32 cores, 33 GB RAM).

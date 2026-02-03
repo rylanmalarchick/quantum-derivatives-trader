@@ -12,7 +12,7 @@ import numpy as np
 from typing import Optional
 
 
-def create_vqc(n_qubits: int, n_layers: int, dev: qml.Device):
+def create_vqc(n_qubits: int, n_layers: int, dev: qml.device):
     """
     Create a variational quantum circuit for function approximation.
 
@@ -61,7 +61,7 @@ def create_vqc(n_qubits: int, n_layers: int, dev: qml.Device):
     return circuit
 
 
-def create_data_reuploading_circuit(n_qubits: int, n_layers: int, dev: qml.Device):
+def create_data_reuploading_circuit(n_qubits: int, n_layers: int, dev: qml.device):
     """
     Data re-uploading circuit.
 
