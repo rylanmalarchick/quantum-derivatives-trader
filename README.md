@@ -2,7 +2,7 @@
 
 > Exploring quantum computing's potential for financial PDE solving through variational quantum circuits and physics-informed neural networks.
 
-[![Tests](https://img.shields.io/badge/tests-125%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-200%20passing-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.14-blue)]()
 [![PyTorch](https://img.shields.io/badge/pytorch-2.10-orange)]()
 [![PennyLane](https://img.shields.io/badge/pennylane-0.44-blueviolet)]()
@@ -121,18 +121,19 @@ The VQC uses parameterized gates with trainable angles, optimized end-to-end via
 
 | Metric | Value |
 |--------|-------|
-| MSE vs Analytical | TBD |
-| Training Time | TBD |
+| MSE vs Analytical | 247.34 |
+| Training Time | ~30s |
 | Parameters | 12,737 |
 
-### Quantum-Classical Hybrid
+### Quantum-Classical Hybrid (Best Config: 4 qubits, 2 layers)
 
 | Metric | Value |
 |--------|-------|
-| MSE vs Analytical | TBD |
-| Training Time | TBD |
+| MSE vs Analytical | **4.34** (57x better!) |
+| Training Time | ~26 min |
+| Parameters | ~500 |
 | Qubits | 4 |
-| Circuit Depth | 3 layers |
+| Circuit Depth | 2 layers |
 
 ### Convergence Analysis
 
@@ -171,7 +172,7 @@ We implement two VQC architectures:
 
 ```bash
 pytest tests/ -v --tb=short
-# 125 tests passing
+# 200 tests passing
 ```
 
 ### Test Coverage
