@@ -31,15 +31,15 @@ import matplotlib.pyplot as plt
 # Add src to path for imports
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT))
 
-from quantum.hybrid_pinn import HybridPINN, DeepHybridPINN, QuantumResidualPINN
-from classical.pinn import PINN, PINNTrainer
-from pde.black_scholes import BSParams, bs_analytical
-from pricing.analytical import AnalyticalPricer
-from data.collocation import create_grid, generate_collocation_points
-from classical.losses import PINNLoss
-from utils.visualization import (
+from src.quantum.hybrid_pinn import HybridPINN, DeepHybridPINN, QuantumResidualPINN
+from src.classical.pinn import PINN, PINNTrainer
+from src.pde.black_scholes import BSParams, bs_analytical
+from src.pricing.analytical import AnalyticalPricer
+from src.data.collocation import create_grid, generate_collocation_points
+from src.classical.losses import PINNLoss
+from src.utils.visualization import (
     plot_training_history,
     plot_comparison,
     plot_surface,

@@ -43,17 +43,17 @@ import matplotlib.pyplot as plt
 # Add src to path for imports
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT))
 
-from classical.pinn import PINN, PINNTrainer
-from quantum.hybrid_pinn import HybridPINN
-from pde.black_scholes import BSParams, bs_analytical, bs_delta, bs_gamma
-from pricing.analytical import AnalyticalPricer
-from pricing.monte_carlo import MonteCarloEngine
-from pricing.finite_difference import FiniteDifferencePricer, FDGrid
-from data.collocation import create_grid, generate_collocation_points
-from classical.losses import PINNLoss
-from utils.visualization import set_publication_style
+from src.classical.pinn import PINN, PINNTrainer
+from src.quantum.hybrid_pinn import HybridPINN
+from src.pde.black_scholes import BSParams, bs_analytical, bs_delta, bs_gamma
+from src.pricing.analytical import AnalyticalPricer
+from src.pricing.monte_carlo import MonteCarloEngine
+from src.pricing.finite_difference import FiniteDifferencePricer, FDGrid
+from src.data.collocation import create_grid, generate_collocation_points
+from src.classical.losses import PINNLoss
+from src.utils.visualization import set_publication_style
 
 
 @dataclass

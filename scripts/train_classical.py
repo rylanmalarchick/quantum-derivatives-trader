@@ -25,14 +25,14 @@ import matplotlib.pyplot as plt
 # Add src to path for imports
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT))
 
-from classical.pinn import PINN, PINNTrainer
-from classical.networks import MLP, ResidualMLP
-from pde.black_scholes import BSParams, bs_analytical
-from pricing.analytical import AnalyticalPricer
-from data.collocation import create_grid
-from utils.visualization import (
+from src.classical.pinn import PINN, PINNTrainer
+from src.classical.networks import MLP, ResidualMLP
+from src.pde.black_scholes import BSParams, bs_analytical
+from src.pricing.analytical import AnalyticalPricer
+from src.data.collocation import create_grid
+from src.utils.visualization import (
     plot_training_history,
     plot_comparison,
     plot_surface,
