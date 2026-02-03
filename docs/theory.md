@@ -16,6 +16,9 @@
 6. [Multi-Asset Black-Scholes PDE](#6-multi-asset-black-scholes-pde)
 7. [Inverse Problems and Volatility Calibration](#7-inverse-problems-and-volatility-calibration)
 8. [Hybrid Quantum-Classical Architectures for High Dimensions](#8-hybrid-quantum-classical-architectures-for-high-dimensions)
+9. [Merton Jump-Diffusion Model](#9-merton-jump-diffusion-model)
+10. [Heston Stochastic Volatility Model](#10-heston-stochastic-volatility-model)
+11. [American Options and Free Boundary Problems](#11-american-options-and-free-boundary-problems)
 
 ---
 
@@ -592,6 +595,314 @@ The quantum advantage in hybrid architectures may come from:
 - **Optimization landscape:** Different loss landscape geometry
 
 Current evidence is mixed; rigorous quantum advantage for PINN-like tasks remains an open question.
+
+---
+
+## 9. Merton Jump-Diffusion Model
+
+### 9.1 Asset Dynamics with Jumps
+
+The classical Black-Scholes model assumes continuous price paths, but empirical evidence shows that asset prices exhibit **discontinuous jumps** (e.g., earnings announcements, market crashes). Merton (1976) extended the geometric Brownian motion to include Poisson-driven jumps:
+
+$$\boxed{\frac{dS}{S} = (r - \lambda\kappa) \, dt + \sigma \, dW + (J-1) \, dN}$$
+
+where:
+- $W$ is a standard Brownian motion (continuous component)
+- $N$ is a Poisson process with intensity $\lambda$ (jump arrivals per unit time)
+- $J$ is the random jump multiplier: $S \to SJ$ upon a jump
+- $\sigma$ is the diffusion volatility (between jumps)
+
+### 9.2 Jump Size Distribution
+
+The jump multiplier $J$ follows a **lognormal distribution**:
+
+$$\log(J) \sim \mathcal{N}(\mu_J, \sigma_J^2)$$
+
+| Parameter | Meaning | Typical Value |
+|-----------|---------|---------------|
+| $\lambda$ | Jump intensity (jumps/year) | 0.5 - 2.0 |
+| $\mu_J$ | Mean of $\log(J)$ | $-0.10$ (negative for crashes) |
+| $\sigma_J$ | Std of $\log(J)$ | 0.10 - 0.25 |
+
+The **expected relative jump size** is:
+
+$$\boxed{\kappa = \mathbb{E}[J-1] = e^{\mu_J + \frac{1}{2}\sigma_J^2} - 1}$$
+
+For typical parameters with $\mu_J < 0$, we have $\kappa < 0$, reflecting the asymmetric nature of market jumps (crashes more common than spikes).
+
+### 9.3 The Pricing PIDE
+
+Option prices under the Merton model satisfy a **partial integro-differential equation (PIDE)**:
+
+$$\boxed{\frac{\partial V}{\partial t} + (r - \lambda\kappa) S \frac{\partial V}{\partial S} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} - rV + \lambda \int_0^\infty \left[ V(SJ, t) - V(S, t) \right] g(J) \, dJ = 0}$$
+
+where $g(J)$ is the lognormal density of the jump size:
+
+$$g(J) = \frac{1}{J\sigma_J\sqrt{2\pi}} \exp\left( -\frac{(\log J - \mu_J)^2}{2\sigma_J^2} \right)$$
+
+**Key differences from Black-Scholes:**
+- The drift is adjusted: $r \to r - \lambda\kappa$ to maintain risk-neutrality
+- An **integral term** accounts for the expected change in option value due to jumps
+- The equation is non-local: the value at $S$ depends on values at all $SJ$
+
+### 9.4 Numerical Approximation of the Integral Term
+
+The integral term cannot be evaluated analytically for general $V$. For PINNs, we use **Gauss-Hermite quadrature**:
+
+$$\int_{-\infty}^{\infty} f(x) e^{-x^2} \, dx \approx \sum_{i=1}^{n} w_i f(x_i)$$
+
+Since $\log(J) \sim \mathcal{N}(\mu_J, \sigma_J^2)$, we substitute $z = (\log J - \mu_J)/(\sigma_J\sqrt{2})$:
+
+$$\int_0^\infty V(SJ) g(J) \, dJ = \frac{1}{\sqrt{\pi}} \sum_{i=1}^{n} w_i \, V\left(S \cdot e^{\mu_J + \sigma_J \sqrt{2} x_i}\right)$$
+
+where $(x_i, w_i)$ are the Gauss-Hermite nodes and weights. Typical choices use $n = 15$-$30$ quadrature points.
+
+### 9.5 Semi-Analytical Pricing Formula
+
+Merton derived a remarkable **series solution** for European options. The call price is a weighted sum of Black-Scholes prices:
+
+$$\boxed{C = \sum_{n=0}^{\infty} \frac{e^{-\lambda' \tau} (\lambda' \tau)^n}{n!} \cdot C^{BS}(S, K, \tau, r_n, \sigma_n)}$$
+
+where $\tau = T - t$ and the adjusted parameters for $n$ jumps are:
+
+| Quantity | Formula |
+|----------|---------|
+| $\lambda'$ | $\lambda(1 + \kappa)$ |
+| $\sigma_n^2$ | $\sigma^2 + n\sigma_J^2 / \tau$ |
+| $r_n$ | $r - \lambda\kappa + n\log(1+\kappa)/\tau$ |
+
+**Interpretation:** The price is a Poisson-weighted average over scenarios with 0, 1, 2, ... jumps occurring before expiry. In the $n$-jump scenario:
+- Volatility increases by $\sqrt{n}\sigma_J/\sqrt{\tau}$ (jumps add variance)
+- The effective interest rate adjusts for the expected drift from $n$ jumps
+
+The series converges rapidly; typically 30-50 terms suffice for machine precision.
+
+### 9.6 PINN Loss Function for Merton
+
+For the PINN approach, the loss includes:
+
+$$\mathcal{L}_{\text{total}} = \lambda_{\text{PIDE}} \mathcal{L}_{\text{PIDE}} + \lambda_{\text{IC}} \mathcal{L}_{\text{IC}}$$
+
+where the PIDE residual loss is:
+
+$$\mathcal{L}_{\text{PIDE}} = \frac{1}{N} \sum_{i=1}^{N} \left| \frac{\partial V}{\partial t} + (r-\lambda\kappa)S\frac{\partial V}{\partial S} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} - rV + \lambda \cdot I[V] \right|^2$$
+
+and $I[V]$ is the numerically approximated integral term.
+
+*See `src/pde/merton.py` for implementation details.*
+
+---
+
+## 10. Heston Stochastic Volatility Model
+
+### 10.1 The Stochastic Volatility Framework
+
+The Black-Scholes model assumes constant volatility, contradicting the empirically observed **volatility smile/skew**. Heston (1993) introduced a model where volatility itself is a stochastic process:
+
+$$\boxed{\begin{aligned}
+dS &= rS \, dt + \sqrt{v} \, S \, dW_S \\
+dv &= \kappa(\theta - v) \, dt + \xi \sqrt{v} \, dW_v
+\end{aligned}}$$
+
+with correlated Brownian motions:
+
+$$dW_S \cdot dW_v = \rho \, dt$$
+
+### 10.2 Model Parameters
+
+| Parameter | Symbol | Meaning | Typical Range |
+|-----------|--------|---------|---------------|
+| Mean reversion speed | $\kappa$ | Rate at which $v$ returns to $\theta$ | 1.0 - 5.0 |
+| Long-run variance | $\theta$ | Equilibrium level of variance | 0.02 - 0.10 |
+| Volatility of volatility | $\xi$ | How much variance fluctuates | 0.2 - 0.8 |
+| Correlation | $\rho$ | Asset-variance correlation | $-0.9$ to $-0.3$ (equity) |
+| Initial variance | $v_0$ | Starting variance level | $\approx \theta$ |
+
+**The Feller condition** ensures the variance process remains strictly positive:
+
+$$\boxed{2\kappa\theta > \xi^2}$$
+
+When violated, the variance can hit zero, requiring boundary treatment. For typical equity parameters, the Feller condition is often marginally satisfied or violated.
+
+### 10.3 The 3D Pricing PDE
+
+Option prices $V(S, v, t)$ satisfy a **three-dimensional PDE** (two spatial, one temporal):
+
+$$\boxed{\frac{\partial V}{\partial t} + \frac{1}{2}vS^2 \frac{\partial^2 V}{\partial S^2} + \rho\xi vS \frac{\partial^2 V}{\partial S \partial v} + \frac{1}{2}\xi^2 v \frac{\partial^2 V}{\partial v^2} + rS\frac{\partial V}{\partial S} + \kappa(\theta-v)\frac{\partial V}{\partial v} - rV = 0}$$
+
+**Key features:**
+- **Cross-derivative term** $\frac{\partial^2 V}{\partial S \partial v}$: couples the asset and variance dimensions
+- **Degenerate at** $v = 0$: all diffusion terms vanish when variance hits zero
+- **Mean reversion drift** $\kappa(\theta - v)$: pulls variance toward $\theta$
+
+### 10.4 Boundary Conditions
+
+| Boundary | Condition |
+|----------|-----------|
+| $S = 0$ | $V(0, v, t) = 0$ (call), $V(0, v, t) = Ke^{-r(T-t)}$ (put) |
+| $S \to \infty$ | $V \to S - Ke^{-r(T-t)}$ (call), $V \to 0$ (put) |
+| $v = 0$ | PDE degenerates; use limiting behavior or absorbing condition |
+| $v \to \infty$ | $V \to S$ (extreme volatility: option has full upside) |
+| $t = T$ | Payoff: $\max(S - K, 0)$ or $\max(K - S, 0)$ |
+
+### 10.5 Characteristic Function and Semi-Analytical Pricing
+
+Heston derived a **semi-analytical solution** using Fourier methods. The characteristic function of $\log(S_T/S_0)$ under the risk-neutral measure is:
+
+$$\phi(u; \tau) = \exp\left( C(u; \tau) + D(u; \tau) v_0 + iu \log(S_0) \right)$$
+
+where $C$ and $D$ satisfy Riccati ODEs with closed-form solutions:
+
+$$\begin{aligned}
+d &= \sqrt{(\rho\xi iu - \kappa)^2 + \xi^2(iu + u^2)} \\
+g &= \frac{\kappa - \rho\xi iu - d}{\kappa - \rho\xi iu + d} \\
+C(u; \tau) &= r \cdot iu \cdot \tau + \frac{\kappa\theta}{\xi^2}\left[ (\kappa - \rho\xi iu - d)\tau - 2\log\left(\frac{1 - ge^{-d\tau}}{1-g}\right) \right] \\
+D(u; \tau) &= \frac{\kappa - \rho\xi iu - d}{\xi^2} \cdot \frac{1 - e^{-d\tau}}{1 - ge^{-d\tau}}
+\end{aligned}$$
+
+The call price is then obtained via **Fourier inversion**:
+
+$$C = S_0 P_1 - Ke^{-r\tau} P_2$$
+
+where $P_1$ and $P_2$ are computed by numerical integration of the characteristic function.
+
+### 10.6 PINN Architecture for Heston
+
+The PINN takes **3D input** $(S, v, t)$ and outputs the option value $V$:
+
+```
+(S, v, t) → Normalize → MLP → V
+
+Normalization:
+  S̃ = S / S_max
+  ṽ = v / v_max  
+  t̃ = t / T
+```
+
+**Loss function:**
+
+$$\mathcal{L} = \lambda_{\text{PDE}} \mathcal{L}_{\text{PDE}} + \lambda_{\text{IC}} \mathcal{L}_{\text{IC}} + \lambda_{\text{BC}} \mathcal{L}_{\text{BC}}$$
+
+**Sampling considerations:**
+- Variance $v$ should be sampled from a distribution concentrated around $\theta$, avoiding $v \approx 0$ where the PDE degenerates
+- The correlation $\rho < 0$ creates skew: more training points needed for low $S$, high $v$ regions
+
+*See `src/pde/heston.py` for implementation details.*
+
+---
+
+## 11. American Options and Free Boundary Problems
+
+### 11.1 The Early Exercise Feature
+
+Unlike European options (exercisable only at maturity), **American options** can be exercised at any time $t \leq T$. This flexibility has significant pricing implications:
+
+- American call on non-dividend stock: equals European call (never optimal to exercise early)
+- American put: strictly more valuable than European put
+- The **early exercise premium** is: $V_{\text{American}} - V_{\text{European}} > 0$
+
+### 11.2 The Obstacle Problem Formulation
+
+American option pricing leads to a **free boundary problem** or **obstacle problem**. The option value must satisfy three conditions simultaneously:
+
+$$\boxed{\begin{aligned}
+&\text{(i)} \quad V(S, t) \geq \Phi(S) \quad &\text{(no-arbitrage: worth at least intrinsic)} \\
+&\text{(ii)} \quad \mathcal{L}V \leq 0 \quad &\text{(PDE inequality)} \\
+&\text{(iii)} \quad (V - \Phi) \cdot \mathcal{L}V = 0 \quad &\text{(complementarity)}
+\end{aligned}}$$
+
+where:
+- $\Phi(S)$ is the payoff function: $\max(K - S, 0)$ for put, $\max(S - K, 0)$ for call
+- $\mathcal{L}$ is the Black-Scholes differential operator:
+
+$$\mathcal{L}V = \frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + rS\frac{\partial V}{\partial S} - rV$$
+
+### 11.3 Interpretation of the Conditions
+
+| Region | Condition | $V$ vs $\Phi$ | $\mathcal{L}V$ | Optimal Action |
+|--------|-----------|---------------|----------------|----------------|
+| **Continuation** | $V > \Phi$ | Strictly greater | $= 0$ | Hold the option |
+| **Exercise** | $V = \Phi$ | Equal | $< 0$ | Exercise immediately |
+
+The **complementarity condition** (iii) ensures exactly one of two cases holds:
+- If $V > \Phi$: we must have $\mathcal{L}V = 0$ (standard Black-Scholes)
+- If $\mathcal{L}V < 0$: we must have $V = \Phi$ (exercise is optimal)
+
+### 11.4 The Early Exercise Boundary
+
+The domain is partitioned by the **early exercise boundary** $S^*(t)$:
+
+**For American put:**
+- **Exercise region:** $S < S^*(t)$ — exercise immediately for payoff $K - S$
+- **Continuation region:** $S > S^*(t)$ — hold the option
+- $S^*(T) = K$ (at maturity, exercise when ITM)
+- $S^*(t) < K$ for $t < T$ (exercise threshold decreases as expiry approaches)
+
+**For American call (with dividends):**
+- **Exercise region:** $S > S^*(t)$
+- **Continuation region:** $S < S^*(t)$
+
+The boundary $S^*(t)$ is **not known a priori** and must be determined as part of the solution — hence "free boundary problem."
+
+### 11.5 Penalty Method for PINNs
+
+Direct enforcement of the complementarity conditions is challenging for neural networks. The **penalty method** provides a smooth approximation:
+
+**Obstacle penalty:**
+
+$$\mathcal{L}_{\text{obstacle}} = \frac{1}{N}\sum_{i=1}^{N} \left[ \text{ReLU}(\Phi(S_i) - V(S_i, t_i)) \right]^2$$
+
+This penalizes violations of $V \geq \Phi$.
+
+**PDE penalty (continuation region):**
+
+$$\mathcal{L}_{\text{PDE}} = \frac{1}{N}\sum_{i=1}^{N} \left[ \text{ReLU}(\mathcal{L}V) \right]^2$$
+
+This penalizes $\mathcal{L}V > 0$ (only enforce $\mathcal{L}V \leq 0$).
+
+**Complementarity penalty:**
+
+$$\mathcal{L}_{\text{comp}} = \frac{1}{N}\sum_{i=1}^{N} \left[ (V - \Phi) \cdot \text{ReLU}(\mathcal{L}V) \right]$$
+
+This encourages $(V - \Phi) \cdot \mathcal{L}V = 0$.
+
+### 11.6 Network Architecture with Built-in Constraint
+
+A more robust approach **builds the obstacle constraint into the architecture**:
+
+$$V(S, t) = \Phi(S) + \text{softplus}(\text{NN}(S, t))$$
+
+This guarantees $V \geq \Phi$ by construction:
+- The network outputs a "time value" which is always non-negative
+- Total value = intrinsic value + time value
+- At expiry, time value → 0, so $V(S, T) = \Phi(S)$ automatically
+
+### 11.7 American Put Premium
+
+The early exercise premium for American puts can be substantial:
+
+| $S/K$ | European Put | American Put | Premium |
+|-------|--------------|--------------|---------|
+| 0.8 | 17.5 | 20.0 | 14% |
+| 1.0 | 5.6 | 6.1 | 9% |
+| 1.2 | 1.4 | 1.5 | 7% |
+
+*Example: $K = 100$, $\sigma = 0.20$, $r = 0.05$, $T = 1$*
+
+The premium is larger for:
+- Deep in-the-money puts (high intrinsic value)
+- Longer maturities (more opportunities to exercise)
+- Higher interest rates (greater benefit from receiving $K$ early)
+
+### 11.8 Numerical Validation
+
+American option PINNs should be validated against:
+
+1. **Binomial tree** (Cox-Ross-Rubinstein): $O(N^2)$ complexity, converges as $N \to \infty$
+2. **Finite difference with PSOR**: Projected Successive Over-Relaxation for the obstacle problem
+3. **Least-squares Monte Carlo** (Longstaff-Schwartz): Regression-based early exercise approximation
+
+*See `src/pde/american.py` for implementation details.*
 
 ---
 
