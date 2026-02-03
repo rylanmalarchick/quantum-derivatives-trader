@@ -1,0 +1,104 @@
+# ==========================
+# Python Bytecode
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyc
+
+# ==========================
+# Virtual Environments
+# ==========================
+venv/
+.venv/
+env/
+ENV/
+.python-version
+
+# ==========================
+# IDE / Editor Files
+# ==========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.spyderproject
+.spyproject
+
+# ==========================
+# Jupyter Notebooks
+# ==========================
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ==========================
+# Model Checkpoints & Outputs
+# ==========================
+*.pt
+*.pth
+*.onnx
+*.h5
+checkpoints/
+outputs/
+results/
+models/saved/
+
+# ==========================
+# Data Files
+# ==========================
+data/*.csv
+data/*.json
+data/**/*.csv
+data/**/*.json
+!data/.gitkeep
+
+# ==========================
+# Build Artifacts
+# ==========================
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+*.whl
+
+# ==========================
+# Testing Artifacts
+# ==========================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+
+# ==========================
+# Environment Files
+# ==========================
+.env
+.env.local
+.env.*.local
+*.env
+
+# ==========================
+# OS Files
+# ==========================
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ==========================
+# Misc
+# ==========================
+*.log
+*.bak
+*.tmp
+.cache/
