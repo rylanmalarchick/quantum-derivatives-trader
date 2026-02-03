@@ -2,7 +2,7 @@
 
 > Exploring quantum computing's potential for financial PDE solving through variational quantum circuits and physics-informed neural networks.
 
-[![Tests](https://img.shields.io/badge/tests-261%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-292%20passing-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.14-blue)]()
 [![PyTorch](https://img.shields.io/badge/pytorch-2.10-orange)]()
 [![PennyLane](https://img.shields.io/badge/pennylane-0.44-blueviolet)]()
@@ -21,6 +21,9 @@ This project investigates whether **variational quantum circuits (VQCs)** can en
 | Quantum-Hybrid PINN | Forward PDE | 2D | ✅ 57x better than classical |
 | 5-Asset Basket Option | Forward PDE | **6D** | ✅ Beats curse of dimensionality |
 | Volatility Calibration | **Inverse Problem** | 2D | ✅ <5% vol recovery error |
+| Merton Jump-Diffusion | Forward PIDE | 2D | ✅ Discontinuous dynamics |
+| Heston Stochastic Vol | Forward PDE | **3D** | ✅ Vol smile modeling |
+| American Options | Free Boundary | 2D | ✅ Early exercise |
 
 ### What This Is
 
@@ -48,7 +51,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 # Run tests
-pytest tests/ -v  # 261 tests
+pytest tests/ -v  # 292 tests
 
 # Train classical PINN baseline (Black-Scholes)
 python scripts/train_classical.py --epochs 5000 --lr 1e-3
@@ -61,6 +64,15 @@ python scripts/train_basket.py --epochs 5000 --n_interior 15000 --eval
 
 # Train volatility calibration (inverse problem)
 python scripts/train_calibration.py --epochs 2000
+
+# Train Merton jump-diffusion
+python scripts/train_merton.py --epochs 2000 --eval
+
+# Train Heston stochastic volatility
+python scripts/train_heston.py --epochs 3000 --eval
+
+# Train American put option
+python scripts/train_american.py --epochs 2000 --eval
 ```
 
 ---
@@ -73,7 +85,10 @@ quantum-derivatives-trader/
 │   ├── pde/                 # PDE definitions
 │   │   ├── black_scholes.py # 1D European option PDE
 │   │   ├── basket.py        # N-asset basket option PDE
-│   │   └── dupire.py        # Local volatility model
+│   │   ├── dupire.py        # Local volatility model
+│   │   ├── merton.py        # Jump-diffusion (PIDE)
+│   │   ├── heston.py        # Stochastic volatility (3D PDE)
+│   │   └── american.py      # Early exercise (free boundary)
 │   ├── classical/           # Classical PINN architectures
 │   │   ├── pinn.py          # Standard MLP PINN
 │   │   ├── pinn_basket.py   # High-dimensional basket PINN
@@ -174,7 +189,7 @@ $$\sigma^2(K,T) = \frac{2\left(\frac{\partial C}{\partial T} + rK\frac{\partial 
 
 ```bash
 pytest tests/ -v --tb=short
-# 261 tests passing
+# 292 tests passing
 ```
 
 ### Test Coverage
@@ -194,8 +209,9 @@ pytest tests/ -v --tb=short
 - [x] Phase 2: Quantum VQC integration (57x improvement)
 - [x] Phase 3A: High-dimensional basket options (5 assets, 6D)
 - [x] Phase 3B: Volatility surface calibration (inverse problem)
+- [x] Phase 5: Jump-diffusion (Merton) and stochastic volatility (Heston)
+- [x] Phase 5B: American options with early exercise
 - [ ] Phase 4: Hybrid quantum for high-dimensional problems
-- [ ] Phase 5: Jump-diffusion and stochastic volatility
 - [ ] Phase 6: Real hardware experiments (IBM/IonQ)
 
 ---
