@@ -309,9 +309,13 @@ class TaskScheduler:
                 
                 # Wait for at least one to complete
                 done_futures = []
-                for future in as_completed(futures, timeout=0.1):
-                    done_futures.append(future)
-                    break
+                try:
+                    for future in as_completed(futures, timeout=1.0):
+                        done_futures.append(future)
+                        break
+                except TimeoutError:
+                    # Still waiting, loop back and check
+                    continue
                 
                 if not done_futures:
                     continue
