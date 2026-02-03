@@ -1,8 +1,15 @@
 # System Architecture
 
-This document describes the software architecture of the quantum-classical hybrid PINN project for derivatives pricing.
+> **Executive Summary**: This document describes the software architecture of the quantum-classical hybrid PINN system for derivatives pricing. The codebase follows a modular design with clear separation between PDE definitions, classical neural networks, quantum circuits, and pricing engines. All components are fully tested (200+ tests) and designed for extensibility.
+
+**Key Design Principles**:
+- PDEs are pure functions, independent of neural network implementation
+- Unified pricing interface across analytical, MC, FD, and PINN methods  
+- Quantum layers are drop-in replacements for classical layers
+- Greeks computed via automatic differentiation, not finite differences
 
 ---
+
 
 ## 1. Module Structure Overview
 

@@ -1,6 +1,18 @@
 # Mathematical Foundations
 
-This document provides the theoretical background for the quantum-classical hybrid PINN approach to derivatives pricing.
+> **Executive Summary**: This document provides the theoretical underpinnings for using quantum-classical hybrid physics-informed neural networks (PINNs) to solve the Black-Scholes PDE. We derive the PDE from first principles, formalize the PINN loss function, explain variational quantum circuit expressivity, and outline quantum amplitude estimation for potential future speedups.
+
+**Target Audience**: Quantitative researchers familiar with derivatives pricing and interested in ML/quantum approaches.
+
+---
+
+## Table of Contents
+
+1. [Black-Scholes PDE](#1-black-scholes-pde)
+2. [Physics-Informed Neural Networks](#2-physics-informed-neural-networks-pinns)
+3. [Variational Quantum Circuits](#3-variational-quantum-circuits-for-function-approximation)
+4. [Quantum Amplitude Estimation](#4-quantum-amplitude-estimation)
+5. [Key References](#5-key-references)
 
 ---
 
