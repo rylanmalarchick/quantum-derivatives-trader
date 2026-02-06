@@ -44,9 +44,9 @@ This project uses **physics-informed neural networks (PINNs)** to solve partial 
 
 | Method | Feasibility | Memory | Greeks |
 |--------|-------------|--------|--------|
-| Finite Difference | ❌ 10^12 grid points | Impossible | Numerical noise |
-| Monte Carlo | ✅ But slow | Moderate | Pathwise |
-| **PINN** | ✅ 15K collocation points | ~3 GB | **Exact (autodiff)** |
+| Finite Difference | No -- 10^12 grid points | Impossible | Numerical noise |
+| Monte Carlo | Yes, but slow | Moderate | Pathwise |
+| **PINN** | **Yes** -- 15K collocation points | ~3 GB | **Exact (autodiff)** |
 
 **Result**: Final loss 1.40, 3.9% error vs Monte Carlo at S₀.
 
@@ -72,10 +72,10 @@ This project uses **physics-informed neural networks (PINNs)** to solve partial 
 
 | Observation | Status |
 |-------------|--------|
-| VQC trains and produces gradients | ✅ |
-| Hybrid beats poorly-tuned classical | ✅ |
-| Hybrid beats well-tuned classical | ❓ Needs ablation |
-| Practical pricing accuracy (<1% error) | ❌ Not yet |
+| VQC trains and produces gradients | Yes |
+| Hybrid beats poorly-tuned classical | Yes |
+| Hybrid beats well-tuned classical | Needs ablation |
+| Practical pricing accuracy (<1% error) | Not yet |
 
 **Honest conclusion**: The quantum component is research-stage. We're investigating expressivity and optimization landscape differences, not claiming advantage.
 
